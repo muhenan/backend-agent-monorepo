@@ -86,18 +86,54 @@ async function restoreConversation() {
   }
 }
 
+async function readEventStream(response, onEvent) {
+  if (!response.body) throw new Error("浏览器不支持读取流式响应。");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  function dispatch(block) {
+    if (!block.trim()) return;
+    let eventName = "message";
+    const dataLines = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith(":")) continue;
+      if (line.startsWith("event:")) eventName = line.slice(6).trim();
+      if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+    }
+    if (dataLines.length) onEvent(eventName, JSON.parse(dataLines.join("\n")));
+  }
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    const blocks = buffer.split(/\r?\n\r?\n/);
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) dispatch(block);
+    if (done) {
+      if (buffer.trim()) dispatch(buffer);
+      return;
+    }
+  }
+}
+
 async function sendMessage(event) {
   event.preventDefault();
   const message = input.value.trim();
   if (!message || sendButton.disabled) return;
+  input.value = "";
 
   statusLabel.textContent = "";
   sendButton.disabled = true;
   newChatButton.disabled = true;
-  const pendingMessage = appendMessage("assistant", "正在思考…", { pending: true });
+  const userBubble = appendMessage("user", message);
+  const pendingMessage = appendMessage("assistant", "", { pending: true });
+  const assistantText = pendingMessage.querySelector(".message-content");
+  let completed = false;
 
   try {
-    const response = await fetch("/api/chat/", {
+    const response = await fetch("/api/chat/stream/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -108,17 +144,32 @@ async function sendMessage(event) {
         conversation_id: localStorage.getItem(conversationStorageKey),
       }),
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "请求失败，请重试。");
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "请求失败，请重试。");
+    }
 
-    pendingMessage.remove();
-    localStorage.setItem(conversationStorageKey, data.conversation_id);
-    appendMessage("user", data.user_message);
-    appendMessage("assistant", data.assistant_message);
-    input.value = "";
-    input.focus();
+    await readEventStream(response, (eventName, data) => {
+      if (eventName === "delta") {
+        assistantText.textContent += data.text;
+        statusLabel.textContent = "正在生成…";
+        scrollToBottom();
+      } else if (eventName === "done") {
+        completed = true;
+        localStorage.setItem(conversationStorageKey, data.conversation_id);
+        assistantText.textContent = data.assistant_message;
+        pendingMessage.classList.remove("pending");
+        statusLabel.textContent = "";
+        input.focus();
+      } else if (eventName === "error") {
+        throw new Error(data.error || "AI 助手暂时无法回答，请稍后重试。");
+      }
+    });
+    if (!completed) throw new Error("连接提前结束，请检查服务日志后重试。");
   } catch (error) {
     pendingMessage.remove();
+    userBubble.remove();
+    if (!input.value) input.value = message;
     statusLabel.textContent = error.message || "网络请求失败，请确认服务已经启动。";
   } finally {
     sendButton.disabled = false;

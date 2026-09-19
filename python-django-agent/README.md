@@ -56,7 +56,7 @@ docker compose exec web uv run --no-sync python manage.py shell
 docker compose up -d db
 uv sync
 uv run python manage.py migrate
-uv run python manage.py runserver
+uv run uvicorn config.asgi:application --host 127.0.0.1 --port 8000
 ```
 
 此时 `.env` 中的 `DB_HOST=localhost` 会让本机 Django 连接 Compose 暴露的数据库端口。想用 SQLite 快速试 Django ORM 时，将 `DB_ENGINE=sqlite`，然后运行迁移即可。
