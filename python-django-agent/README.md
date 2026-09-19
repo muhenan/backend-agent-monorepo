@@ -12,7 +12,7 @@
    Copy-Item .env.example .env
    ```
 
-2. 编辑 `.env`，填入 `OPENAI_API_KEY`。可以按需修改 `OPENAI_MODEL`。
+2. 编辑 `.env`，填入 `OPENAI_API_KEY` 和服务支持的 `OPENAI_MODEL`。如需使用兼容服务，再填写 `OPENAI_BASE_URL`。
 3. 在本目录运行：
 
    ```sh

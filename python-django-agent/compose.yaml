@@ -25,7 +25,7 @@ services:
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-luna}
+      OPENAI_MODEL: ${OPENAI_MODEL:?Please set OPENAI_MODEL in .env}
       OPENAI_AGENTS_DISABLE_TRACING: ${OPENAI_AGENTS_DISABLE_TRACING:-}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-development-only-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-true}

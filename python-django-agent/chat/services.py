@@ -29,6 +29,9 @@ def django_learning_tip(topic: str) -> str:
 def _create_agent() -> Agent:
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("请先在 .env 中设置 OPENAI_API_KEY。")
+    model_name = os.getenv("OPENAI_MODEL")
+    if not model_name:
+        raise RuntimeError("请先在 .env 中设置 OPENAI_MODEL。")
 
     return Agent(
         name="Django 学习助手",
@@ -37,7 +40,7 @@ def _create_agent() -> Agent:
             "优先用中文回答，先解释概念，再给出简短、可运行的示例。"
             "当用户询问 Django 学习建议时，可以使用 django_learning_tip 工具。"
         ),
-        model=os.getenv("OPENAI_MODEL", "gpt-5.6-luna"),
+        model=model_name,
         tools=[django_learning_tip],
     )
 
