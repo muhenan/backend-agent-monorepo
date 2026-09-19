@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8fc">
+  <title>Python Django Agent · 项目架构</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: #17233d;
+      background: #f6f8fc;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 18% 0%, rgba(88, 111, 245, .08), transparent 34rem),
+        #f6f8fc;
+    }
+
+    main {
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 56px 0 48px;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #5c6ee8;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 40px);
+      letter-spacing: -.04em;
+      line-height: 1.15;
+    }
+
+    .intro {
+      max-width: 700px;
+      margin: 14px 0 28px;
+      color: #64718a;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .diagram-frame {
+      overflow-x: auto;
+      border: 1px solid #e4e9f2;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, .86);
+      box-shadow: 0 18px 55px rgba(39, 57, 93, .08);
+      scrollbar-color: #bdc7dc transparent;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      min-width: 900px;
+      height: auto;
+    }
+
+    .node { fill: #fff; stroke: #dce4f0; stroke-width: 1.5; }
+    .node-browser { stroke: #bfc9ff; }
+    .node-agent { stroke: #d9c9ff; }
+    .node-db { stroke: #a9dfd2; }
+    .node-model { stroke: #f3d3a4; }
+    .django-boundary { fill: #f5f6ff; stroke: #d8defb; stroke-width: 1.5; }
+    .node-title { fill: #192541; font-size: 18px; font-weight: 720; }
+    .node-subtitle { fill: #63718a; font-size: 13px; }
+    .node-code { fill: #485773; font-family: Consolas, "Cascadia Code", monospace; font-size: 12px; }
+    .boundary-title { fill: #5969d9; font-size: 14px; font-weight: 750; letter-spacing: .03em; }
+    .flow-label { fill: #66748d; font-size: 11px; font-weight: 650; }
+    .flow {
+      fill: none;
+      stroke: #8795ad;
+      stroke-width: 2;
+      marker-end: url(#arrow);
+    }
+    .flow-response { stroke: #697bea; marker-end: url(#arrow-accent); }
+    .flow-internal { stroke: #9aa7bc; stroke-dasharray: 4 5; }
+    .small-pill { fill: #eef1ff; }
+    .small-pill-text { fill: #5869d9; font-size: 11px; font-weight: 700; }
+
+    .note {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 18px 4px 0;
+      color: #63718a;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .note-mark {
+      display: grid;
+      width: 22px;
+      height: 22px;
+      flex: 0 0 22px;
+      place-items: center;
+      border-radius: 7px;
+      background: #e9edff;
+      color: #5969d9;
+      font-weight: 800;
+    }
+
+    @media (max-width: 600px) {
+      main { width: calc(100% - 24px); padding-top: 36px; }
+      .intro { margin-bottom: 20px; }
+      .diagram-frame { border-radius: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">VISUALIZE · LEARN</p>
+    <h1>Python Django Agent</h1>
+    <p class="intro">一张图看懂浏览器、Django、Agent、模型服务和 PostgreSQL 怎样协作完成一轮聊天。</p>
+
+    <section class="diagram-frame" aria-label="当前项目架构图">
+      <svg viewBox="0 0 1200 600" role="img" aria-labelledby="diagram-title diagram-description">
+        <title id="diagram-title">Python Django Agent 当前项目架构</title>
+        <desc id="diagram-description">浏览器调用 Django 流式聊天接口。Django 读取和保存 PostgreSQL 中的对话，并通过 Agents SDK 调用模型 API。</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#8795ad"></path>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#697bea"></path>
+          </marker>
+        </defs>
+
+        <!-- Django service boundary -->
+        <rect class="django-boundary" x="350" y="54" width="500" height="520" rx="22"></rect>
+        <text class="boundary-title" x="380" y="88">DJANGO WEB · UVICORN / ASGI</text>
+        <rect class="small-pill" x="735" y="68" width="88" height="26" rx="13"></rect>
+        <text class="small-pill-text" x="779" y="85" text-anchor="middle">localhost:8000</text>
+
+        <!-- Connections are drawn before the cards -->
+        <path class="flow" d="M295 255 C330 255 350 205 390 205"></path>
+        <path class="flow flow-response" d="M390 237 C350 237 330 287 295 287"></path>
+        <text class="flow-label" x="322" y="205" text-anchor="middle">请求</text>
+        <text class="flow-label" x="322" y="315" text-anchor="middle">SSE</text>
+
+        <path class="flow flow-internal" d="M600 278 V344"></path>
+        <text class="flow-label" x="614" y="316">调用 Agent</text>
+
+        <path class="flow" d="M810 171 H930"></path>
+        <path class="flow flow-response" d="M930 199 H810"></path>
+        <text class="flow-label" x="870" y="156" text-anchor="middle">ORM 读写</text>
+
+        <path class="flow" d="M810 392 H930"></path>
+        <path class="flow flow-response" d="M930 420 H810"></path>
+        <text class="flow-label" x="870" y="377" text-anchor="middle">模型请求 / 回复</text>
+
+        <!-- Browser -->
+        <rect class="node node-browser" x="45" y="203" width="250" height="170" rx="17"></rect>
+        <text class="node-title" x="70" y="240">浏览器页面</text>
+        <text class="node-subtitle" x="70" y="268">网页由 Django 提供</text>
+        <text class="node-code" x="70" y="302">templates/chat/index.html</text>
+        <text class="node-code" x="70" y="325">static/chat/app.js + app.css</text>
+        <text class="node-subtitle" x="70" y="352">显示流式回复 · 记住对话 ID</text>
+
+        <!-- Django routes and views -->
+        <rect class="node" x="390" y="120" width="420" height="158" rx="17"></rect>
+        <text class="node-title" x="418" y="157">路由与请求处理</text>
+        <text class="node-code" x="418" y="184">config/urls.py → chat/urls.py</text>
+        <text class="node-code" x="418" y="207">chat/views.py · POST /api/chat/stream/</text>
+        <text class="node-subtitle" x="418" y="235">校验输入 · 加载历史 · 返回 SSE · 保存问答</text>
+        <text class="node-subtitle" x="418" y="258">GET / 页面 · 历史消息接口 · /admin/</text>
+
+        <!-- Agent service -->
+        <rect class="node node-agent" x="390" y="344" width="420" height="160" rx="17"></rect>
+        <text class="node-title" x="418" y="382">Agent 服务</text>
+        <text class="node-code" x="418" y="409">chat/services.py</text>
+        <text class="node-subtitle" x="418" y="438">Agents SDK：Agent + Runner（流式生成）</text>
+        <text class="node-subtitle" x="418" y="466">示例工具：django_learning_tip</text>
+
+        <!-- PostgreSQL -->
+        <rect class="node node-db" x="930" y="120" width="235" height="158" rx="17"></rect>
+        <text class="node-title" x="955" y="158">PostgreSQL</text>
+        <text class="node-subtitle" x="955" y="187">对话持久化</text>
+        <text class="node-code" x="955" y="218">chat_conversation</text>
+        <text class="node-code" x="955" y="242">chat_message</text>
+
+        <!-- Model provider -->
+        <rect class="node node-model" x="930" y="344" width="235" height="160" rx="17"></rect>
+        <text class="node-title" x="955" y="382">模型 API</text>
+        <text class="node-subtitle" x="955" y="411">OpenAI 兼容服务</text>
+        <text class="node-code" x="955" y="442">OPENAI_BASE_URL</text>
+        <text class="node-subtitle" x="955" y="472">例如 OpenAI / DeepSeek</text>
+
+        <text class="flow-label" x="350" y="548">浏览器负责显示；Django 负责业务；Agent 调用模型；PostgreSQL 保存对话。</text>
+      </svg>
+    </section>
+
+    <p class="note"><span class="note-mark" aria-hidden="true">i</span><span>当前前端和 API 由同一个 Django 服务提供。聊天接口通过 SSE 把生成中的回答逐段发回浏览器。</span></p>
+  </main>
+</body>
+</html>
