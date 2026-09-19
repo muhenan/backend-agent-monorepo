@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-django_agent}
+      POSTGRES_USER: ${POSTGRES_USER:-django_agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-django_agent}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-django_agent} -d ${POSTGRES_DB:-django_agent}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: >
+      sh -c "uv run --no-sync python manage.py migrate &&
+      uv run --no-sync python manage.py runserver 0.0.0.0:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-luna}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-development-only-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DB_ENGINE: postgres
+      DB_NAME: ${POSTGRES_DB:-django_agent}
+      DB_USER: ${POSTGRES_USER:-django_agent}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-django_agent}
+      DB_HOST: db
+      DB_PORT: 5432
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+

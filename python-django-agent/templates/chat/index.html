@@ -1,0 +1,69 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Django × Agents 学习助手</title>
+    <link rel="stylesheet" href="{% static 'chat/app.css' %}">
+    <script src="{% static 'chat/app.js' %}" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="返回首页">
+          <span class="brand-mark">DA</span>
+          <span>学习工作台</span>
+        </a>
+        <div class="topbar-right">
+          <span class="service-indicator"><span></span> Django API 在线</span>
+          <a class="admin-link" href="/admin/">管理后台 ↗</a>
+        </div>
+      </header>
+
+      <section class="chat-panel" aria-label="聊天窗口">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">PYTHON · DJANGO · AGENTS SDK</p>
+            <h1>Django 学习助手</h1>
+            <p class="subtitle">把问题拆成小步骤，一起读懂后端和智能体。</p>
+          </div>
+          <button class="new-chat-button" id="new-chat" type="button" title="开始新对话">
+            <span aria-hidden="true">＋</span> 新对话
+          </button>
+        </div>
+
+        <div class="transcript" id="transcript" aria-live="polite" aria-label="消息记录">
+          <div class="welcome-card" id="empty-state">
+            <div class="welcome-icon" aria-hidden="true">✳</div>
+            <h2>你好，今天想学什么？</h2>
+            <p>可以从 Django 的模型、视图和路由开始，也可以看看 Agent 与 Runner 如何配合。</p>
+            <div class="suggestions" aria-label="示例问题">
+              <button type="button" data-prompt="Django 的 Model、View 和 URL 分别负责什么？">解释 Django 的 MVT</button>
+              <button type="button" data-prompt="OpenAI Agents SDK 里的 Agent 和 Runner 是什么关系？">认识 Agent 和 Runner</button>
+              <button type="button" data-prompt="请用简单例子解释 Django migration 是怎么工作的。">理解数据库迁移</button>
+            </div>
+          </div>
+        </div>
+
+        <form class="composer" id="chat-form">
+          <label class="sr-only" for="message-input">输入你的问题</label>
+          <textarea id="message-input" name="message" rows="1" maxlength="4000"
+            placeholder="输入一个关于 Django 或 Agents SDK 的问题…" required></textarea>
+          <div class="composer-footer">
+            <span class="input-hint">Enter 发送 · Shift + Enter 换行</span>
+            <div class="composer-actions">
+              <span id="status" class="status" role="status" aria-live="polite"></span>
+              <button class="send-button" id="send-button" type="submit">
+                <span>发送</span><span aria-hidden="true">↑</span>
+              </button>
+            </div>
+          </div>
+        </form>
+        <p class="footnote">AI 回答可能有误，请把它当作学习起点。</p>
+      </section>
+    </main>
+  </body>
+</html>
+
