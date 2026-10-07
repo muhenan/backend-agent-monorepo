@@ -4,14 +4,14 @@
 help: ## Show the available commands
 	@echo "Commands: up, down, logs, migrate, makemigrations, shell, createsuperuser, db"
 
-up: ## Build the app image and start Django + PostgreSQL
+up: ## Build and start Django + PostgreSQL + MinIO
 	docker compose up --build
 
 down: ## Stop the containers (keep the database volume)
 	docker compose down
 
 logs: ## Follow app and database logs
-	docker compose logs -f web db
+	docker compose logs -f web db minio
 
 migrate: ## Apply Django database migrations
 	docker compose exec web uv run --no-sync python manage.py migrate

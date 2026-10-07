@@ -1,4 +1,17 @@
 services:
+  minio:
+    image: django-agent-minio:RELEASE.2025-09-07T16-13-09Z
+    build:
+      context: ./minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-django-agent}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-django-agent-local-password}
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
   db:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -21,6 +34,7 @@ services:
     restart: unless-stopped
     command: >
       sh -c "uv run --no-sync python manage.py migrate &&
+      uv run --no-sync python manage.py init_object_storage &&
       uv run --no-sync uvicorn config.asgi:application --host 0.0.0.0 --port 8000"
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -36,11 +50,18 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-django_agent}
       DB_HOST: db
       DB_PORT: 5432
+      S3_ENDPOINT_URL: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-django-agent}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-django-agent-local-password}
+      S3_BUCKET: ${S3_BUCKET:-chat-attachments}
     ports:
       - "${WEB_PORT:-8000}:8000"
     depends_on:
+      minio:
+        condition: service_started
       db:
         condition: service_healthy
 
 volumes:
+  minio_data:
   postgres_data:

@@ -48,6 +48,12 @@
         </div>
 
         <form class="composer" id="chat-form">
+          <div class="attachment-toolbar">
+            <label class="upload-label" for="attachment-input">＋ 上传 PDF / 图片</label>
+            <input id="attachment-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" hidden>
+            <span class="input-hint">单文件最多 10 MB；每次最多选择 4 个</span>
+          </div>
+          <div id="attachments" class="attachments" aria-label="会话附件"></div>
           <label class="sr-only" for="message-input">输入你的问题</label>
           <textarea id="message-input" name="message" rows="1" maxlength="4000"
             placeholder="输入一个关于 Django 或 Agents SDK 的问题…" required></textarea>
@@ -66,4 +72,3 @@
     </main>
   </body>
 </html>
-

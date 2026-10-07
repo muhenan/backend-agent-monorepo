@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Conversation, Message
+from .models import Attachment, Conversation, Message
+
+
+@admin.register(Attachment)
+class AttachmentAdmin(admin.ModelAdmin):
+    list_display = ["name", "conversation", "content_type", "size", "created_at"]
+    readonly_fields = ["id", "bucket", "object_key", "extracted_text", "created_at"]
 
 
 class MessageInline(admin.TabularInline):
@@ -22,4 +28,3 @@ class MessageAdmin(admin.ModelAdmin):
     list_display = ["id", "conversation", "role", "created_at"]
     list_filter = ["role", "created_at"]
     search_fields = ["content"]
-

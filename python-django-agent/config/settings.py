@@ -87,3 +87,12 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "http://localhost:9000")
+S3_ACCESS_KEY = os.getenv("MINIO_ROOT_USER", "django-agent")
+S3_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD", "django-agent-local-password")
+S3_BUCKET = os.getenv("S3_BUCKET", "chat-attachments")
+ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+ATTACHMENT_MAX_COUNT = 4
+PDF_MAX_PAGES = 50
+PDF_MAX_TEXT_CHARS = 60000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024

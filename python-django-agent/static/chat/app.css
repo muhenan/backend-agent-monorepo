@@ -101,3 +101,9 @@ h1 { margin: 0; font-size: clamp(21px, 3vw, 27px); letter-spacing: -.04em; }
   .composer { margin: 0 11px; padding: 12px 12px 10px; }
   .input-hint { font-size: 9px; }
 }
+/* Uploaded references stay available across conversation turns. */
+.attachment-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.upload-label { cursor: pointer; font-size: 13px; font-weight: 600; }
+.attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.attachment-item { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 5px 9px; border: 1px solid #ddd; border-radius: 8px; font-size: 12px; }
+.attachment-item a { overflow-wrap: anywhere; color: inherit; }

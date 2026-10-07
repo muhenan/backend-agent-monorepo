@@ -9,8 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=uv /uv /uvx /bin/
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
-RUN uv sync --no-dev --no-install-project
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 EXPOSE 8000

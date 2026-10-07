@@ -6,4 +6,4 @@ __pycache__/
 staticfiles/
 .ruff_cache/
 .pytest_cache/
-
+*.tar

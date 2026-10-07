@@ -39,3 +39,17 @@ class Message(models.Model):
     def __str__(self) -> str:
         return f"{self.get_role_display()}: {self.content[:40]}"
 
+
+class Attachment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="attachments")
+    name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=64)
+    size = models.PositiveIntegerField()
+    bucket = models.CharField(max_length=63)
+    object_key = models.CharField(max_length=512, unique=True)
+    extracted_text = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]

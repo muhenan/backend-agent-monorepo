@@ -6,6 +6,75 @@ const sendButton = document.querySelector("#send-button");
 const newChatButton = document.querySelector("#new-chat");
 const statusLabel = document.querySelector("#status");
 const csrfToken = document.querySelector("meta[name='csrf-token']").content;
+const attachmentInput = document.querySelector("#attachment-input");
+const attachmentList = document.querySelector("#attachments");
+let attachments = [];
+let uploading = false;
+
+function renderAttachments() {
+  attachmentList.replaceChildren();
+  for (const attachment of attachments) {
+    const row = document.createElement("label");
+    row.className = "attachment-item";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = attachment.selected;
+    checkbox.disabled = uploading || sendButton.disabled;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked && attachments.filter((a) => a.selected).length >= 4) {
+        checkbox.checked = false;
+        statusLabel.textContent = "每次提问最多选择 4 个附件。";
+        return;
+      }
+      attachment.selected = checkbox.checked;
+    });
+    const link = document.createElement("a");
+    link.href = attachment.download_url;
+    link.textContent = attachment.name;
+    link.title = "下载原文件";
+    row.append(checkbox, link);
+    attachmentList.append(row);
+  }
+}
+
+attachmentInput.addEventListener("change", async () => {
+  const file = attachmentInput.files[0];
+  if (!file || uploading || sendButton.disabled) return;
+  if (file.size > 10 * 1024 * 1024) {
+    statusLabel.textContent = "文件不能超过 10 MB。";
+    attachmentInput.value = "";
+    return;
+  }
+  uploading = true;
+  sendButton.disabled = true;
+  newChatButton.disabled = true;
+  attachmentInput.disabled = true;
+  renderAttachments();
+  statusLabel.textContent = "正在上传并解析…";
+  const payload = new FormData();
+  payload.append("file", file);
+  const id = localStorage.getItem(conversationStorageKey);
+  if (id) payload.append("conversation_id", id);
+  try {
+    const response = await fetch("/api/attachments/", {
+      method: "POST", headers: { "X-CSRFToken": csrfToken }, body: payload,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "上传失败。");
+    localStorage.setItem(conversationStorageKey, data.conversation_id);
+    attachments.push({ ...data.attachment, selected: attachments.filter((a) => a.selected).length < 4 });
+    statusLabel.textContent = "已保存，可以针对附件提问。";
+  } catch (error) {
+    statusLabel.textContent = error.message || "上传失败，请重试。";
+  } finally {
+    uploading = false;
+    sendButton.disabled = false;
+    newChatButton.disabled = false;
+    attachmentInput.disabled = false;
+    attachmentInput.value = "";
+    renderAttachments();
+  }
+});
 const starterPrompts = [
   "Django 的 Model、View 和 URL 分别负责什么？",
   "OpenAI Agents SDK 里的 Agent 和 Runner 是什么关系？",
@@ -80,6 +149,8 @@ async function restoreConversation() {
     if (!response.ok) throw new Error("找不到之前的对话");
     const data = await response.json();
     for (const message of data.messages) appendMessage(message.role, message.content);
+    attachments = (data.attachments || []).map((a, index) => ({ ...a, selected: index < 4 }));
+    renderAttachments();
   } catch (error) {
     localStorage.removeItem(conversationStorageKey);
     statusLabel.textContent = error.message;
@@ -127,6 +198,8 @@ async function sendMessage(event) {
   statusLabel.textContent = "";
   sendButton.disabled = true;
   newChatButton.disabled = true;
+  attachmentInput.disabled = true;
+  renderAttachments();
   const userBubble = appendMessage("user", message);
   const pendingMessage = appendMessage("assistant", "", { pending: true });
   const assistantText = pendingMessage.querySelector(".message-content");
@@ -142,6 +215,7 @@ async function sendMessage(event) {
       body: JSON.stringify({
         message,
         conversation_id: localStorage.getItem(conversationStorageKey),
+        attachment_ids: attachments.filter((a) => a.selected).map((a) => a.id),
       }),
     });
     if (!response.ok) {
@@ -174,6 +248,8 @@ async function sendMessage(event) {
   } finally {
     sendButton.disabled = false;
     newChatButton.disabled = false;
+    attachmentInput.disabled = false;
+    renderAttachments();
   }
 }
 
@@ -187,6 +263,8 @@ input.addEventListener("keydown", (event) => {
 
 newChatButton.addEventListener("click", () => {
   localStorage.removeItem(conversationStorageKey);
+  attachments = [];
+  renderAttachments();
   transcript.replaceChildren(createWelcomeCard());
   statusLabel.textContent = "";
   input.focus();
@@ -199,4 +277,12 @@ transcript.addEventListener("click", (event) => {
   form.requestSubmit();
 });
 
-restoreConversation();
+sendButton.disabled = true;
+newChatButton.disabled = true;
+attachmentInput.disabled = true;
+restoreConversation().finally(() => {
+  sendButton.disabled = false;
+  newChatButton.disabled = false;
+  attachmentInput.disabled = false;
+  renderAttachments();
+});
