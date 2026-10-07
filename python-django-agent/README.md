@@ -2,6 +2,8 @@
 
 这是一个可以单独运行的后端学习项目，包含 Django 聊天 API、原生网页界面、OpenAI Agents SDK、PostgreSQL 和 MinIO 私有对象存储。Docker Compose 会一起启动三个服务；`uv` 负责 Python 依赖管理。
 
+项目统一使用 Docker 构建、运行和测试。Django、PostgreSQL、MinIO 均运行在容器中，本机无需安装 Python 或 `uv`。
+
 ## 快速启动
 
 需要 Docker Desktop（含 Docker Compose）和一个 OpenAI API key。
@@ -42,7 +44,7 @@ docker image save -o minio-local.tar django-agent-minio:RELEASE.2025-09-07T16-13
 docker image load -i minio-local.tar
 ```
 
-MinIO API 为 `http://localhost:9000`，浏览界面为 `http://localhost:9001`。默认本地账号 `django-agent`、密码 `django-agent-local-password`，可以在 `.env` 中设置 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`。上传时自动创建 `chat-attachments` 私有 bucket。Compose 内部 Django 使用 `http://minio:9000`，本机 Django 使用 `.env` 中的 `S3_ENDPOINT_URL=http://localhost:9000`。
+MinIO API 为 `http://localhost:9000`，浏览界面为 `http://localhost:9001`。默认本地账号 `django-agent`、密码 `django-agent-local-password`，可以在 `.env` 中设置 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`。上传时自动创建 `chat-attachments` 私有 bucket。Django 容器通过 `http://minio:9000` 访问存储，本机浏览器通过上述 localhost 地址访问。
 
 > `.env` 里的 Django 密钥和数据库密码仅供本地学习使用。部署到公网前请换成安全配置，并使用正式的 WSGI/ASGI 服务器。
 >
@@ -68,20 +70,7 @@ docker compose exec web uv run --no-sync python manage.py migrate
 docker compose exec web uv run --no-sync python manage.py shell
 ```
 
-## 不用 Docker 运行 Django
-
-你仍可以用本机 Python 和 `uv` 启动 Django；PostgreSQL 可以继续由 Docker 提供：
-
-```sh
-docker compose up -d --build db minio
-uv sync
-uv run python manage.py migrate
-uv run uvicorn config.asgi:application --host 127.0.0.1 --port 8000
-```
-
-此时 `.env` 中的 `DB_HOST=localhost` 会让本机 Django 连接 Compose 暴露的数据库端口。想用 SQLite 快速试 Django ORM 时，将 `DB_ENGINE=sqlite`，然后运行迁移即可。
-
-仓库包含 `uv.lock`；Docker 使用 `uv sync --frozen` 安装锁定的依赖。本地可运行 `uv sync --locked`。
+仓库包含 `uv.lock`；Docker 镜像构建时使用 `uv sync --frozen` 安装锁定的 Python 依赖。
 
 ## 验证
 
@@ -106,15 +95,6 @@ docker compose exec -T web uv run --no-sync python manage.py smoke_attachments c
 ```
 
 `seed` / `verify` / `cleanup` 期间不要重建或删除 web 容器，测试状态文件暂存在该容器 `/tmp`，普通 restart 会保留它。
-
-以下测试使用 SQLite 测试数据库，并模拟 S3 和模型服务，不需要 API key 或运行 MinIO：
-
-```powershell
-$env:DB_ENGINE = "sqlite"
-uv run --no-sync python manage.py test chat
-uv run --no-sync python manage.py check
-uv run --no-sync python manage.py makemigrations --check --dry-run
-```
 
 Docker 启动后的人工验收：上传文字 PDF 并针对内容提问；上传图片并要求解释；刷新页面检查附件和消息恢复；点击文件名下载；`docker compose down` 后重新启动，检查资料仍可用。
 
@@ -229,6 +209,12 @@ Agent 使用 `Runner.run_streamed()` 生成内容。后端通过 SSE 的 `delta`
 配置中的 `S3` 表示兼容 S3 的接口，我们实际连接本地 MinIO。`boto3` 负责对象存储操作，`pypdf` 负责 PDF 文字提取，Pillow 负责图片验证；Python 依赖由 `uv.lock` 固定。
 
 可以从这些实验开始：修改 `Agent.instructions`、给 Agent 增加工具、在 `Message` 添加字段、生成并应用 migration，或在 `chat/urls.py` 新增 API 路由。
+
+## TODO
+
+- [ ] 前端优化：图片和附件部分。
+- [ ] RAGflow。
+- [ ] mem0。
 
 ## 官方文档
 
