@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f5f7" />
+    <title>Mem0 Memory Chat</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="Mem0 Chat home">
+          <span class="brand-mark">m</span>
+          <span><strong>memo</strong><small>MEMORY LAB</small></span>
+        </a>
+        <button class="new-chat" id="new-chat"><span>＋</span> 新对话</button>
+        <div class="side-label">WORKSPACE</div>
+        <div class="workspace-item active"><span class="workspace-dot"></span> Memory Chatbot</div>
+        <div class="side-bottom">
+          <div class="side-label">YOUR MEMORY</div>
+          <div class="memory-summary"><span class="memory-icon">✳</span><span><b id="memory-count">0 条记忆</b><small>Mem0 长期记忆</small></span></div>
+          <button class="clear-button" id="clear-memories">清空长期记忆</button>
+          <div class="profile"><div class="avatar">M</div><div class="profile-info"><b id="profile-user">demo-user</b><small>当前记忆身份</small></div><span class="online-dot"></span></div>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>Workspace</span><i>/</i><b>Memory Chatbot</b></div>
+          <div class="top-actions"><span class="status-pill"><span></span> Mem0 connected</span><button class="icon-button" title="设置" aria-label="设置">⚙</button></div>
+        </header>
+        <section class="chat-area" id="chat-area">
+          <div class="welcome" id="welcome">
+            <div class="welcome-mark">✳</div>
+            <p class="eyebrow">YOUR ASSISTANT, WITH MEMORY</p>
+            <h1>你好，今天想聊些什么？</h1>
+            <p class="welcome-copy">我会记住对你有帮助的信息，让每次对话都更贴近你。</p>
+            <div class="suggestions">
+              <button class="suggestion" data-prompt="我叫小林，是一名后端工程师，最近在学习 Mem0。"><span>✳</span><b>认识一下</b><small>告诉我你的名字、工作或兴趣</small><i>↗</i></button>
+              <button class="suggestion" data-prompt="我平时喜欢用中文交流，回答请简洁一些。"><span>文</span><b>设置偏好</b><small>让我了解你喜欢的交流方式</small><i>↗</i></button>
+              <button class="suggestion" data-prompt="你记得我哪些事情？"><span>⌕</span><b>测试记忆</b><small>看看我们之前聊过什么</small><i>↗</i></button>
+            </div>
+          </div>
+          <div class="messages" id="messages" aria-live="polite"></div>
+          <div class="memory-inspector hidden" id="memory-inspector">
+            <div class="inspector-heading"><div><span class="inspector-icon">✳</span><b>本轮记忆活动</b></div><button id="close-inspector" aria-label="关闭">×</button></div>
+            <div class="inspector-columns"><div><small>检索到的记忆</small><div id="recalled-list"></div></div><div><small>新增或更新</small><div id="saved-list"></div></div></div>
+          </div>
+        </section>
+        <footer class="composer-wrap">
+          <form class="composer" id="chat-form">
+            <textarea id="message-input" rows="1" placeholder="发消息给 Memory Chatbot…" aria-label="消息内容"></textarea>
+            <div class="composer-bottom"><div class="composer-hint"><span>↵</span> 发送 <span class="hint-separator">·</span> 消息会用于更新你的记忆</div><button class="send-button" id="send-button" aria-label="发送消息">↑</button></div>
+          </form>
+          <div class="disclaimer">AI 生成的内容可能不准确。对话记忆保存在本地 Qdrant 中。</div>
+        </footer>
+      </main>
+
+      <aside class="memory-panel">
+        <div class="panel-heading"><div><span class="panel-spark">✳</span><b>Memory</b></div><button class="icon-button" id="refresh-memories" title="刷新记忆">↻</button></div>
+        <p class="panel-subtitle">关于你的长期记忆</p>
+        <div class="user-selector"><span class="user-icon">◎</span><label class="user-id-field"><small>当前身份（本地标识）</small><input id="user-id" value="demo-user" maxlength="100" aria-label="记忆身份" /></label><button class="apply-user-id" id="apply-user-id">切换</button></div>
+        <div class="memory-list-heading"><span>已保存记忆</span><span class="count-badge" id="panel-count">0</span></div>
+        <div class="memory-list" id="memory-list"><div class="empty-memory"><span>✳</span><b>还没有记忆</b><small>聊过的偏好和背景<br />会整理在这里</small></div></div>
+        <div class="memory-note"><span>ⓘ</span><p>切换标识会切换对应的记忆空间。它不需要注册登录，也不是访问权限保护。</p></div>
+        <div class="powered-by">POWERED BY <b>mem0</b><span>·</span> OPENAI AGENTS SDK</div>
+      </aside>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
