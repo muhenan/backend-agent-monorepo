@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -12,24 +15,75 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agent_mem.agent import answer
-from agent_mem.memory import delete_memory, list_memories, save_turn, search_memories
+from agent_mem.memory import delete_memory, list_memories, save_turn
+
+logger = logging.getLogger("uvicorn.error")
 
 load_dotenv()
 
-app = FastAPI(title="Mem0 Memory Chatbot", description="A learning project for persistent AI memory")
+app = FastAPI(
+    title="Mem0 Memory Chatbot", description="A learning project for persistent AI memory"
+)
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+class HistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=10000)
 
 
 class ChatRequest(BaseModel):
     user_id: str = Field(min_length=1, max_length=100)
     message: str = Field(min_length=1, max_length=10000)
+    history: list[HistoryMessage] = Field(default_factory=list, max_length=20)
+
+
+class SearchActivity(BaseModel):
+    query: str
+    status: Literal["ok", "error"]
+    memories: list[str]
+
+
+class WriteEvent(BaseModel):
+    id: str
+    event: Literal["ADD", "UPDATE", "DELETE"]
+    memory: str
+
+
+class WriteActivity(BaseModel):
+    status: Literal["saved", "no_change", "error", "unknown"]
+    events: list[WriteEvent] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):
     answer: str
     recalled_memories: list[str]
     saved_memories: list[str]
+    memory_searches: list[SearchActivity]
+    memory_write: WriteActivity
+
+
+def parse_write_result(result: object) -> WriteActivity:
+    """Only count actual Mem0 mutation events; text alone is not a saved memory."""
+    if not isinstance(result, dict) or not isinstance(result.get("results"), list):
+        return WriteActivity(status="unknown")
+    events = []
+    unknown = False
+    for item in result["results"]:
+        if not isinstance(item, dict):
+            unknown = True
+            continue
+        event = str(item.get("event", "")).upper()
+        if event in {"ADD", "UPDATE", "DELETE"} and item.get("id"):
+            events.append(
+                WriteEvent(id=str(item["id"]), event=event, memory=str(item.get("memory") or ""))
+            )
+        elif event != "NONE":
+            unknown = True
+    return WriteActivity(
+        status="unknown" if unknown else ("saved" if events else "no_change"), events=events
+    )
 
 
 class MemoriesResponse(BaseModel):
@@ -73,7 +127,9 @@ async def clear_memories(user_id: str = Query(min_length=1, max_length=100)) -> 
 
 
 @app.delete("/api/memories/{memory_id}")
-async def remove_memory(memory_id: str, user_id: str = Query(min_length=1, max_length=100)) -> dict[str, str]:
+async def remove_memory(
+    memory_id: str, user_id: str = Query(min_length=1, max_length=100)
+) -> dict[str, str]:
     try:
         delete_memory(memory_id, user_id.strip())
         return {"status": "deleted", "id": memory_id}
@@ -92,10 +148,22 @@ async def chat(request: ChatRequest) -> ChatResponse:
     if not message:
         raise HTTPException(status_code=422, detail="message must not be blank")
     try:
-        recalled = search_memories(user_id, message)
-        response = await answer(message, recalled)
-        result = save_turn(user_id, message, response)
-        saved = [item.get("memory", "") for item in result.get("results", []) if item.get("memory")]
-        return ChatResponse(answer=response, recalled_memories=recalled, saved_memories=saved)
+        result = await answer(message, user_id, [item.model_dump() for item in request.history])
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Chat or memory operation failed: {exc}") from exc
+        raise HTTPException(status_code=503, detail="Agent response failed") from exc
+    try:
+        write_result = await asyncio.to_thread(save_turn, user_id, message, result.answer)
+        write = parse_write_result(write_result)
+    except Exception as exc:  # noqa: BLE001 -- Preserve the answer when memory storage fails.
+        logger.warning("Memory write failed (%s)", type(exc).__name__)
+        write = WriteActivity(status="error")
+    logger.info("Memory write: status=%s events=%d", write.status, len(write.events))
+    return ChatResponse(
+        answer=result.answer,
+        recalled_memories=list(
+            dict.fromkeys(memory for search in result.searches for memory in search["memories"])
+        ),
+        saved_memories=[event.memory for event in write.events if event.event in {"ADD", "UPDATE"}],
+        memory_searches=result.searches,
+        memory_write=write,
+    )

@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const USER_ID_KEY = 'agent-mem-user-id';
-const state = { busy: false, userId: localStorage.getItem(USER_ID_KEY) || 'demo-user' };
+const state = { busy: false, history: [], userId: localStorage.getItem(USER_ID_KEY) || 'demo-user' };
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -53,8 +53,29 @@ async function removeMemory(memoryId) {
     toast('这条记忆已删除');
   } catch (error) { toast(error.message); }
 }
-function renderActivity(target, memories, emptyText) {
-  target.innerHTML = memories.length ? memories.map((memory) => `<div class="inspector-item">${escapeHtml(memory)}</div>`).join('') : `<div class="inspector-empty">${emptyText}</div>`;
+function describeActivity(payload) {
+  const searches = payload.memory_searches;
+  const searchLabel = !searches.length ? '搜索：未调用' :
+    `搜索：调用 ${searches.length} 次${searches.some((entry) => entry.status === 'error') ? '（含失败）' : `，返回 ${payload.recalled_memories.length} 条`}`;
+  const events = payload.memory_write.events;
+  const count = (kind) => events.filter((entry) => entry.event === kind).length;
+  const writeLabels = {
+    saved: `写入：新增 ${count('ADD')} / 更新 ${count('UPDATE')} / 删除 ${count('DELETE')}`,
+    no_change: '写入：已尝试，无变更',
+    error: '写入：失败，回答已保留',
+    unknown: '写入：返回状态无法确认',
+  };
+  return `${searchLabel} · ${writeLabels[payload.memory_write.status]}`;
+}
+function activityHtml(payload) {
+  const searches = payload.memory_searches;
+  const searchHtml = searches.length ? searches.map((entry) =>
+    `<div class="inspector-item"><b>search_memory · ${entry.status === 'error' ? '失败' : '成功'}</b><p>搜索词：${escapeHtml(entry.query)}</p>${entry.status === 'error' ? '查询失败，本次未取得记忆' : entry.memories.length ? entry.memories.map(escapeHtml).join('<br>') : '查询成功，没有匹配记忆'}</div>`
+  ).join('') : '<div class="inspector-empty">Agent 未调用 search_memory</div>';
+  const writeHtml = payload.memory_write.events.map((entry) =>
+    `<div class="inspector-item"><b>${({ ADD: '新增', UPDATE: '更新', DELETE: '删除' })[entry.event]}</b><p>${escapeHtml(entry.memory)}</p><small>记录 ID：${escapeHtml(entry.id)}</small></div>`
+  ).join('') || `<div class="inspector-empty">${escapeHtml(describeActivity(payload).split(' · ').slice(1).join(' · '))}</div>`;
+  return { searchHtml, writeHtml };
 }
 async function sendMessage(text) {
   const message = text.trim();
@@ -63,26 +84,34 @@ async function sendMessage(text) {
   $('#send-button').disabled = true;
   addMessage('user', message);
   $('#message-input').value = '';
-  const pending = addMessage('assistant', '正在检索记忆并思考', 'Mem0 search → OpenAI Agent → Mem0 add');
+  const history = state.history.slice(-20);
+  const pending = addMessage('assistant', '正在思考，必要时搜索记忆…', 'Agent 按需搜索 → 回答 → 尝试保存记忆');
   pending.querySelector('.message-content').classList.add('typing');
   try {
     const response = await fetch('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: state.userId, message }),
+      body: JSON.stringify({ user_id: state.userId, message, history }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || '请求失败');
     pending.querySelector('.message-content').classList.remove('typing');
     pending.querySelector('.message-content').textContent = payload.answer;
-    pending.querySelector('.message-meta').textContent = '已结合长期记忆生成回答';
+    state.history.push({ role: 'user', content: message }, { role: 'assistant', content: payload.answer.slice(0, 10000) });
+    state.history = state.history.slice(-20);
+    pending.querySelector('.message-meta').textContent = describeActivity(payload);
+    const activity = activityHtml(payload);
+    const details = document.createElement('details');
+    details.className = 'turn-memory-details';
+    details.innerHTML = `<summary>查看本轮 Memory 活动</summary><div class="inspector-columns"><div><small>搜索工具</small>${activity.searchHtml}</div><div><small>保存结果</small>${activity.writeHtml}</div></div>`;
+    pending.querySelector('.message-meta').after(details);
     $('#memory-inspector').classList.remove('hidden');
-    renderActivity($('#recalled-list'), payload.recalled_memories, '没有检索到相关记忆');
-    renderActivity($('#saved-list'), payload.saved_memories, '本轮没有提取到新的记忆');
+    $('#recalled-list').innerHTML = activity.searchHtml;
+    $('#saved-list').innerHTML = activity.writeHtml;
     await refreshMemories();
   } catch (error) {
     pending.querySelector('.message-content').classList.remove('typing');
     pending.querySelector('.message-content').textContent = `暂时无法完成请求：${error.message}`;
-    pending.querySelector('.message-meta').textContent = '请检查 OpenAI API Key 和 Qdrant 状态';
+    pending.querySelector('.message-meta').textContent = '本轮未完成；请检查模型服务和容器日志';
   } finally {
     state.busy = false;
     $('#send-button').disabled = false;
@@ -98,6 +127,8 @@ $('#message-input').addEventListener('keydown', (event) => {
 });
 document.querySelectorAll('.suggestion').forEach((button) => button.addEventListener('click', () => sendMessage(button.dataset.prompt)));
 $('#new-chat').addEventListener('click', () => {
+  if (state.busy) { toast('请等当前回复完成后再开始新对话'); return; }
+  state.history = [];
   $('#messages').innerHTML = '';
   $('#welcome').classList.remove('hidden');
   $('#memory-inspector').classList.add('hidden');
@@ -109,6 +140,7 @@ function applyUserId() {
   const userId = $('#user-id').value.trim();
   if (!userId) { toast('身份标识不能为空'); return; }
   if (state.busy) { toast('请等当前回复完成后再切换身份'); return; }
+  state.history = [];
   state.userId = userId;
   localStorage.setItem(USER_ID_KEY, userId);
   $('#user-id').value = userId;

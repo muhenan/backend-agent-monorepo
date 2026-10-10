@@ -1,6 +1,6 @@
 # agent-mem
 
-一个用来学习 **Mem0 memory** 的 Web Chatbot。后端先按用户身份从 Mem0 检索相关的长期记忆，再交给 OpenAI Agents SDK 生成回复，最后将本轮对话交给 Mem0 提取并保存值得记住的信息。前端可以直接输入或切换身份标识，不需要注册登录。
+一个用来学习 **Mem0 memory** 的 Web Chatbot。OpenAI Agents SDK 根据当前会话判断是否调用 `search_memory` 工具搜索 Mem0；生成最终回复后，将本轮用户消息和回复交给 Mem0 提取并保存值得记住的信息。前端可以直接输入或切换身份标识，不需要注册登录。
 
 ## 学习目标
 
@@ -97,16 +97,35 @@ agent-mem/
 ## 一轮对话的数据流
 
 ```text
-浏览器 POST /api/chat
+浏览器 POST /api/chat（当前消息 + 最近 20 条会话消息）
        │
-       ├─ Mem0 search(message, user_id) ──► 当前身份的相关长期记忆
-       │                                           │
-       └───────────────────────────────────────────┴─► Agents SDK Agent ──► 回复
-                                                                          │
-                   浏览器展示回复和记忆活动 ◄── Mem0 add(本轮对话, user_id) ◄┘
+       └─ Agents SDK Agent
+              ├─ 上下文足够：直接回答
+              └─ 缺少历史：search_memory(query) → 当前身份的 Mem0 记忆 → 回答
+                                                                    │
+                         展示实际写入事件 ◄── Mem0 add(本轮用户消息、最终回复)
 ```
 
-这个示例把 `search`、`add`、`get_all` 和 `delete` 放在应用编排中，让 Mem0 的读写过程直接可见。每条记忆卡显示其 Mem0 记录 ID；删除时先确认该 ID 属于当前 `user_id`，再删除对应记录。Agents SDK 的回复由应用显式注入 Mem0 搜索结果，不是通过 Agent tool call；Mem0 的记忆提取都使用 DeepSeek。Mem0 embedding 使用 OpenAI `text-embedding-3-small`，需要单独配置 `OPENAI_API_KEY`。向量维度为 1536，并与 Qdrant collection 配置保持一致。
+没有固定前置搜索，也没有独立路由模型。搜索工具只接受 query，user_id 由服务端绑定到当前请求，最多执行两次 Mem0 搜索。身份标识是本地 Demo 的命名空间，不是身份认证。工具结果不会再次作为新事实提交给 Mem0。
+
+浏览器保留当前会话最近 20 条消息，新对话、刷新页面或切换身份会清除会话上下文，长期记忆仍保留。会话历史只接受 user/assistant 角色。
+
+每条回答下方展示搜索调用次数和写入结果，并可展开查看搜索词、召回内容、实际 ADD/UPDATE/DELETE 事件及记录 ID。未调用、查询无结果、查询失败分别展示；写入为空显示“已尝试，无变更”，写入失败保留回答。非预期写入响应显示“无法确认”，不会将返回文本冒充成功保存。
+
+API 保留 recalled_memories/saved_memories，并增加 memory_searches 和 memory_write。保存状态来自 Mem0 已完成操作返回的事件，不根据模型的“我记住了”判断。
+
+Mem0 提取使用 DeepSeek，embedding 使用 OpenAI text-embedding-3-small（1536 维）。镜像使用 uv.lock 构建，并包含 tests。
+
+## 验证
+
+```sh
+docker compose exec app uv run --no-sync python -m unittest discover -s tests -v
+docker compose exec app uv run --group dev ruff check src tests
+# 真实 API 测试，消耗模型调用，使用独立测试身份并在成功后清理其记忆：
+python tests/live_smoke.py
+```
+
+真实 API 测试要求 localhost:8000 的服务运行。可以手动先介绍姓名与偏好，再点“新对话”询问历史，观察搜索调用和真实保存事件。普通知识问题通常无需搜索；工具选择由模型决定，存在行为波动。
 
 ## 环境变量
 

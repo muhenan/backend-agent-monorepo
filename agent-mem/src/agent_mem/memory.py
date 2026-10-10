@@ -8,6 +8,7 @@ from typing import Any
 
 from mem0 import Memory
 
+
 @lru_cache(maxsize=1)
 def get_memory() -> Memory:
     """Create Mem0 with DeepSeek extraction, OpenAI embeddings, and Qdrant."""
@@ -50,9 +51,7 @@ def get_memory() -> Memory:
 
 def search_memories(user_id: str, query: str, limit: int = 5) -> list[str]:
     """Retrieve semantically relevant memories for one user namespace."""
-    response = get_memory().search(
-        query, filters={"user_id": user_id}, top_k=limit
-    )
+    response = get_memory().search(query, filters={"user_id": user_id}, top_k=limit)
     return [item["memory"] for item in response.get("results", []) if item.get("memory")]
 
 

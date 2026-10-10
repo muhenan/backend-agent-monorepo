@@ -6,10 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN uv sync --no-dev --no-install-project
-RUN uv sync --no-dev --no-editable
+COPY tests ./tests
+RUN find src tests -type f -exec chmod 644 {} +
+RUN uv sync --locked --no-dev --no-install-project
+RUN uv sync --locked --no-dev --no-editable
 EXPOSE 8000
 
 CMD ["uv", "run", "--no-sync", "agent-mem"]
