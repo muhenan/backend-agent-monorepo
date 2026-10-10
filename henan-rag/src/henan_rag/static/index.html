@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Henan RAG Lab</title>
+  <style>
+    :root { font: 15px/1.55 system-ui, sans-serif; color: #17212e; background: #f2f5fa; }
+    * { box-sizing: border-box; }
+    body { max-width: 1180px; margin: 30px auto; padding: 0 18px; }
+    h1 { margin: 0; font-size: 27px; } h2 { margin: 0 0 12px; font-size: 19px; }
+    .sub { margin: 5px 0 22px; color: #5d6b7d; }
+    .layout { display: grid; grid-template-columns: minmax(290px, .8fr) minmax(400px, 1.2fr); gap: 16px; }
+    .panel { background: white; border: 1px solid #dbe3ed; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+    label { display: block; font-weight: 650; margin: 10px 0 5px; }
+    input, textarea { width: 100%; font: inherit; border: 1px solid #bdc9d8; border-radius: 7px; padding: 9px 10px; }
+    textarea { min-height: 88px; resize: vertical; }
+    button { cursor: pointer; border: 0; border-radius: 7px; padding: 9px 13px; background: #1559a6; color: white; font: inherit; }
+    button.secondary { color: #23415f; background: #eaf0f7; }
+    button.danger { background: #fff0ee; color: #a63327; padding: 5px 9px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row button { margin-top: 10px; }
+    .muted { color: #66758a; font-size: 13px; }
+    .status { padding: 9px 11px; background: #f4f7fb; border-radius: 7px; color: #52657c; margin: 9px 0; white-space: pre-wrap; }
+    .doc, .chunk { border-top: 1px solid #e7edf4; padding: 11px 0; }
+    .doc-title { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .chunk { padding-left: 10px; border-left: 3px solid #8eb5e4; margin: 10px 0; background: #fafbfd; }
+    .chunk-head { display: flex; justify-content: space-between; gap: 8px; color: #496582; font-size: 13px; }
+    .chunk-text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 5px; }
+    .answer { white-space: pre-wrap; padding: 12px; background: #f4f7fb; border-radius: 8px; }
+    .badge { font-size: 12px; color: #68788d; }
+    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Henan RAG Lab</h1>
+  <p class="sub">亲手观察 Docling 解析、Qdrant 召回和 Agents SDK 生成。请只用公开或合成资料，不要上传患者数据。</p>
+  <div class="layout">
+    <div>
+      <section class="panel">
+        <h2>① 文档入库</h2>
+        <p class="muted">上传 PDF、DOCX、PPTX、XLSX、HTML、Markdown、TXT 或 CSV。Docling 将文档转换为 Markdown，再切块、向量化并写入 Qdrant。</p>
+        <label for="tenant">知识空间标识</label>
+        <input id="tenant" value="learning-space-1">
+        <label for="file">选择文件</label>
+        <input id="file" type="file" accept=".pdf,.docx,.pptx,.xlsx,.html,.htm,.md,.txt,.csv">
+        <div class="row"><button id="upload">解析并入库</button><button class="secondary" id="refresh">刷新文档</button></div>
+        <div class="status" id="ingest-status">等待上传。入库后会展示文档和 chunk 数。</div>
+        <div id="documents"></div>
+      </section>
+      <section class="panel">
+        <h2>数据流</h2>
+        <div class="status">文件 → Docling Markdown → paragraph-aware chunks → OpenAI embeddings → Qdrant</div>
+        <div class="status">问题 → embedding → Qdrant top-k → 可见证据 → OpenAI Agent → 带引用答案</div>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>② 先检索，再让 Agent 回答</h2>
+      <p class="muted">“只看召回”不调用生成模型；“检索 + 回答”会在同一组召回片段上运行 Agent。对比两者，能分辨是检索问题还是生成问题。</p>
+      <label for="question">问题</label>
+      <textarea id="question" placeholder="例如：资料里的服务开放时间是什么？"></textarea>
+      <div class="row"><button class="secondary" id="retrieve">只看召回</button><button id="chat">检索 + Agent 回答</button></div>
+      <div class="status" id="query-status">尚未查询</div>
+      <h3>召回证据 <span class="badge" id="hit-count"></span></h3>
+      <div id="chunks"></div>
+      <h3>Agent 答案</h3>
+      <div class="answer" id="answer">回答会显示在这里。</div>
+    </section>
+  </div>
+<script>
+const $ = (selector) => document.querySelector(selector);
+const tenantId = () => $('#tenant').value.trim() || 'default';
+function node(tag, className, text) {
+  const item = document.createElement(tag);
+  if (className) item.className = className;
+  if (text !== undefined) item.textContent = text;
+  return item;
+}
+async function api(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+  return data;
+}
+async function loadDocuments() {
+  const docs = await api(`/api/documents?tenant_id=${encodeURIComponent(tenantId())}`);
+  const root = $('#documents'); root.replaceChildren();
+  if (!docs.length) { root.append(node('p', 'muted', '还没有文档')); return; }
+  docs.forEach((doc) => {
+    const row = node('div', 'doc'); const title = node('div', 'doc-title');
+    title.append(node('strong', '', doc.source));
+    const del = node('button', 'danger', '删除');
+    del.onclick = async () => {
+      try {
+        await api(`/api/documents/${encodeURIComponent(doc.document_id)}?tenant_id=${encodeURIComponent(tenantId())}`, {method:'DELETE'});
+        await loadDocuments();
+      } catch (error) { $('#ingest-status').textContent = error.message; }
+    };
+    title.append(del); row.append(title, node('div', 'muted', `${doc.chunk_count} 个 chunks`)); root.append(row);
+  });
+}
+function renderChunks(chunks) {
+  const root = $('#chunks'); root.replaceChildren(); $('#hit-count').textContent = chunks.length ? `（${chunks.length} 条）` : '（0 条）';
+  chunks.forEach((chunk, index) => {
+    const card = node('div', 'chunk'); const head = node('div', 'chunk-head');
+    head.append(node('span', '', `[${index + 1}] ${chunk.source} · chunk ${chunk.chunk_index}`));
+    head.append(node('span', '', `score ${Number(chunk.score).toFixed(4)}`));
+    card.append(head, node('div', 'chunk-text', chunk.text)); root.append(card);
+  });
+}
+$('#upload').onclick = async () => {
+  const file = $('#file').files[0]; if (!file) { $('#ingest-status').textContent = '请先选择文件'; return; }
+  const data = new FormData(); data.append('file', file); data.append('tenant_id', tenantId());
+  $('#ingest-status').textContent = 'Docling 解析和 embedding 中…';
+  try {
+    const result = await api('/api/ingest/file', {method:'POST', body:data});
+    $('#ingest-status').textContent = `已入库：${result.source} · ${result.chunk_count} 个 chunks · document_id ${result.document_id}`;
+    await loadDocuments();
+  } catch (error) { $('#ingest-status').textContent = `失败：${error.message}`; }
+};
+$('#refresh').onclick = () => loadDocuments().catch((error) => { $('#ingest-status').textContent = error.message; });
+$('#retrieve').onclick = async () => {
+  $('#query-status').textContent = '正在向量检索…'; $('#answer').textContent = '尚未运行 Agent。';
+  try {
+    const chunks = await api('/api/retrieve', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:$('#question').value, tenant_id:tenantId(), top_k:5})});
+    renderChunks(chunks); $('#query-status').textContent = '检索完成；这一步没有调用 Chat 模型。';
+  } catch (error) { $('#query-status').textContent = `失败：${error.message}`; }
+};
+$('#chat').onclick = async () => {
+  $('#query-status').textContent = '正在检索并运行 Agents SDK…';
+  try {
+    const result = await api('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:$('#question').value, tenant_id:tenantId(), top_k:5})});
+    renderChunks(result.citations); $('#answer').textContent = result.answer; $('#query-status').textContent = '完成';
+  } catch (error) { $('#query-status').textContent = `失败：${error.message}`; }
+};
+loadDocuments().catch((error) => { $('#ingest-status').textContent = error.message; });
+</script>
+</body>
+</html>

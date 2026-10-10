@@ -1,0 +1,48 @@
+[project]
+name = "henan-rag"
+version = "0.1.0"
+description = "A hands-on RAG learning project with Docling, Qdrant, and OpenAI Agents SDK"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "docling>=2.60.0",
+    "fastapi>=0.115.0",
+    "openai-agents>=0.21.0",
+    "pydantic-settings>=2.7.0",
+    "python-multipart>=0.0.20",
+    "uvicorn[standard]>=0.30.0",
+    "qdrant-client>=1.13.0",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27.0",
+    "pytest>=8.3.0",
+    "ruff>=0.9.0",
+]
+
+[project.scripts]
+henan-rag = "henan_rag.app:run"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/henan_rag"]
+only-include = ["src/henan_rag"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

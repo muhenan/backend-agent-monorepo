@@ -22,6 +22,16 @@
 - 启动：在 `agent-mem/` 下配置 `.env` 后运行 `make up`
 - 本地地址：聊天界面 <http://localhost:8000>；Qdrant Dashboard <http://localhost:6333/dashboard>
 
+## Henan RAG
+
+一个可观察完整 RAG 流程的学习实验室：解析上传文档、按段落切块、生成 embedding 并写入 Qdrant；提问时按 tenant 检索相关片段，再让 Agent 基于检索证据回答并给出引用。
+
+- 目录：[henan-rag/](./henan-rag/)
+- 详细说明：[henan-rag/README.md](./henan-rag/README.md)
+- 技术栈：FastAPI、Docling、OpenAI Embeddings、Qdrant、OpenAI Agents SDK、Docker Compose
+- 启动：在 `henan-rag/` 下配置 `.env` 后运行 `make up`
+- 本地地址：RAG 学习界面 <http://localhost:8002>；Qdrant Dashboard <http://localhost:6335/dashboard>
+
 ## 项目架构可视化
 
 用静态网页图解仓库中的项目架构。目前提供 Django Agent 的架构图，不需要安装依赖或启动服务。
