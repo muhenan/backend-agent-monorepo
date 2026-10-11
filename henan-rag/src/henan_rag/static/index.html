@@ -7,18 +7,34 @@
   <style>
     :root { font: 15px/1.55 system-ui, sans-serif; color: #17212e; background: #f2f5fa; }
     * { box-sizing: border-box; }
-    body { max-width: 1180px; margin: 30px auto; padding: 0 18px; }
+    body { max-width: 1180px; margin: 36px auto; padding: 0 24px; }
     h1 { margin: 0; font-size: 27px; } h2 { margin: 0 0 12px; font-size: 19px; }
-    .sub { margin: 5px 0 22px; color: #5d6b7d; }
-    .layout { display: grid; grid-template-columns: minmax(290px, .8fr) minmax(400px, 1.2fr); gap: 16px; }
-    .panel { background: white; border: 1px solid #dbe3ed; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+    .sub { margin: 7px 0 24px; color: #5d6b7d; }
+    .tabs { display: flex; gap: 8px; padding-bottom: 12px; margin-bottom: 26px; border-bottom: 1px solid #dbe3ed; }
+    .tabs button { background: transparent; color: #52657c; padding: 10px 21px; font-weight: 650; }
+    .tabs button[aria-selected="true"] { background: #1559a6; color: white; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid #8eb5e4; outline-offset: 3px; }
+    .page-heading { margin-bottom: 22px; } .page-heading h2 { margin-bottom: 5px; font-size: 23px; }
+    .page-heading p { margin: 0; color: #66758a; }
+    .management-layout { display: grid; grid-template-columns: minmax(310px, .85fr) minmax(400px, 1.15fr); gap: 24px; align-items: start; }
+    .panel { background: white; border: 1px solid #dbe3ed; border-radius: 14px; padding: 24px; margin-bottom: 24px; }
+    .chat-page { max-width: 960px; margin: 0 auto; }
+    .scope-panel { padding: 20px 24px; }
+    .scope-panel > summary { cursor: pointer; font-weight: 650; color: #23415f; }
+    .scope-toolbar { margin: 14px 0 12px; }
+    .scope-toolbar input { flex: 1 1 230px; }
+    .scope-toolbar button { margin-top: 0; white-space: nowrap; font-size: 13px; padding: 8px 11px; }
+    .chat-panel { padding: 28px; }
+    .chat-panel > label { margin-top: 0; }
+    #question { min-height: 112px; }
     label { display: block; font-weight: 650; margin: 10px 0 5px; }
     input, textarea { width: 100%; font: inherit; border: 1px solid #bdc9d8; border-radius: 7px; padding: 9px 10px; }
+    input[type="checkbox"] { width: auto; accent-color: #1559a6; }
     textarea { min-height: 88px; resize: vertical; }
     button { cursor: pointer; border: 0; border-radius: 7px; padding: 9px 13px; background: #1559a6; color: white; font: inherit; }
     button.secondary { color: #23415f; background: #eaf0f7; }
     button.danger { background: #fff0ee; color: #a63327; padding: 5px 9px; }
-    button:disabled { cursor: wait; opacity: .55; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
     [hidden] { display: none !important; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .row button { margin-top: 10px; }
@@ -51,39 +67,73 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .answer.streaming::after, .tool-call[data-state="running"] .tool-state { animation: none; } }
     .badge { font-size: 12px; color: #68788d; }
-    @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+    .kb { border: 1px solid #e3eaf2; border-radius: 8px; padding: 10px; margin: 8px 0; }
+    .kb.current { border-color: #5189c9; background: #f5f9ff; }
+    .kb-name { padding: 0; background: none; color: #23415f; text-align: left; font-weight: 650; }
+    .kb-name[aria-pressed="true"] { color: #1559a6; }
+    .kb-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .pager { justify-content: space-between; font-size: 13px; }
+    .pager button { padding: 5px 9px; }
+    .chat-scope { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2px 14px; border: 1px solid #dbe3ed; border-radius: 8px; padding: 8px 12px; max-height: 230px; overflow-y: auto; }
+    .chat-choice { display: flex; align-items: flex-start; gap: 8px; margin: 7px 0; font-size: 14px; font-weight: 500; }
+    .chat-choice input { margin-top: 5px; }
+    .scope-label { margin: 12px 0 0; color: #52657c; font-size: 13px; overflow-wrap: anywhere; }
+    .scope-heading { margin: 14px 0 7px; font-size: 15px; }
+    .editor { border-top: 1px solid #e7edf4; margin-top: 14px; padding-top: 10px; }
+    .editor h3 { margin: 0; font-size: 15px; }
+    .error-text { color: #a63327; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .target-name { color: #1559a6; }
+    .status-badge { display: inline-block; padding: 1px 6px; background: #edf2f8; border-radius: 4px; margin-left: 5px; }
+    .doc-actions { display: flex; gap: 7px; flex-wrap: wrap; flex-shrink: 0; }
+    .doc-actions button { padding: 5px 9px; font-size: 13px; }
+    .doc.inspecting { border-left: 3px solid #5189c9; padding-left: 10px; }
+    .document-inspector > .doc-title { align-items: flex-start; }
+    .document-inspector h2 { overflow-wrap: anywhere; }
+    .inspect-layout { display: grid; grid-template-columns: minmax(210px, .7fr) minmax(0, 2fr); gap: 22px; margin-top: 18px; align-items: start; }
+    .inspect-directory { border: 1px solid #e0e8f2; background: #f8fafd; border-radius: 9px; padding: 12px; }
+    .inspect-directory h3, .inspect-content h3 { font-size: 15px; margin: 0 0 12px; }
+    #inspect-directory { max-height: 560px; overflow-y: auto; padding-right: 3px; }
+    .inspect-choice { display: block; width: 100%; text-align: left; background: white; color: #52657c; border: 1px solid #e0e8f2; margin: 7px 0; padding: 10px; }
+    .inspect-choice[aria-pressed="true"] { background: #eaf3ff; color: #1559a6; border-color: #5189c9; }
+    .inspect-choice strong, .inspect-choice span { display: block; }
+    .inspect-choice span { font-size: 12px; font-weight: 400; margin-top: 3px; overflow-wrap: anywhere; }
+    .stored-text { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #dbe3ed; border-radius: 9px; background: #fafbfd; padding: 18px; margin: 12px 0 18px; line-height: 1.75; }
+    .storage-details summary { cursor: pointer; color: #52657c; font-size: 13px; }
+    .storage-fields { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 6px 12px; font-size: 13px; margin: 14px 0; }
+    .storage-fields dt { color: #66758a; } .storage-fields dd { margin: 0; overflow-wrap: anywhere; }
+    .storage-json { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, monospace; background: #f4f7fb; border-radius: 7px; padding: 14px; margin: 7px 0; }
+    .inspect-pager { border-top: 1px solid #e7edf4; padding-top: 14px; margin-top: 18px; }
+    @media (max-width: 760px) { body { margin: 22px auto; padding: 0 14px; } .management-layout, .inspect-layout { grid-template-columns: 1fr; gap: 0; } .panel, .chat-panel { padding: 20px; } .tabs { margin-bottom: 22px; } .inspect-content { margin-top: 18px; } #inspect-directory { max-height: 260px; } .doc-title { flex-wrap: wrap; } .storage-fields { grid-template-columns: 1fr; gap: 2px; } .storage-fields dd { margin-bottom: 8px; } }
   </style>
 </head>
 <body>
   <h1>Henan RAG Lab</h1>
   <p class="sub">亲手观察 Docling 解析、Qdrant 召回和 Agents SDK 生成。请只用公开或合成资料，不要上传患者数据。</p>
-  <div class="layout">
-    <div>
-      <section class="panel">
-        <h2>① 文档入库</h2>
-        <p class="muted">上传 PDF、DOCX、PPTX、XLSX、HTML、Markdown、TXT 或 CSV。Docling 将文档转换为 Markdown，再切块、向量化并写入 Qdrant。</p>
-        <label for="tenant">知识空间标识</label>
-        <input id="tenant" value="learning-space-1">
-        <label for="file">选择文件</label>
-        <input id="file" type="file" accept=".pdf,.docx,.pptx,.xlsx,.html,.htm,.md,.txt,.csv">
-        <div class="row"><button id="upload">解析并入库</button><button class="secondary" id="refresh">刷新文档</button></div>
-        <div class="status" id="ingest-status">等待上传。入库后会展示文档和 chunk 数。</div>
-        <div id="documents"></div>
-      </section>
-      <section class="panel">
-        <h2>数据流</h2>
-        <div class="status">文件 → Docling Markdown → paragraph-aware chunks → OpenAI embeddings → Qdrant</div>
-        <div class="status">问题 → Agent 调用知识库检索工具 → Qdrant top-k → 流式回答 + 引用证据</div>
-      </section>
-    </div>
-    <section class="panel">
-      <h2>② 检索与 Agent 问答</h2>
-      <p class="muted">先用“只看召回”检查证据，再让 Agent 调用知识库工具回答。文字会逐步显示，回复下方可查看工具调用进度。</p>
-      <label for="question">问题</label>
+  <nav class="tabs" role="tablist" aria-label="RAG 功能页面">
+    <button id="chat-tab" type="button" role="tab" aria-selected="true" aria-controls="chat-page" tabindex="0">聊天</button>
+    <button id="management-tab" type="button" role="tab" aria-selected="false" aria-controls="management-page" tabindex="-1">知识库管理</button>
+  </nav>
+  <div class="chat-page" id="chat-page" role="tabpanel" aria-labelledby="chat-tab" tabindex="0">
+    <div class="page-heading"><h2>与知识库聊天</h2><p>选择资料范围，查看检索证据，观察 Agent 的工具调用和流式回答。</p></div>
+    <details class="panel scope-panel" open>
+      <summary id="scope-heading">挂载知识库</summary>
+      <div class="row scope-toolbar">
+        <input id="scope-search" type="search" aria-label="搜索可挂载知识库" placeholder="搜索知识库名称或描述">
+        <button class="secondary" id="select-all-scope" type="button" title="挂载全部可用知识库，不受搜索条件影响">全选可用库</button>
+        <button class="secondary" id="clear-scope" type="button">清空</button>
+        <button class="secondary" id="refresh-scope" type="button">刷新</button>
+      </div>
+      <div class="chat-scope" id="chat-scope" role="group" aria-labelledby="scope-heading"></div>
+      <div class="muted" id="scope-search-results" hidden></div>
+      <div class="scope-label" id="selected-scope" role="status">正在加载检索范围…</div>
+    </details>
+    <section class="panel chat-panel" aria-label="检索与 Agent 问答">
+      <label for="question">你想了解什么？</label>
       <textarea id="question" placeholder="例如：资料里的服务开放时间是什么？"></textarea>
-      <div class="row"><button class="secondary" id="retrieve">只看召回</button><button id="chat">检索 + Agent 回答</button><button class="secondary" id="stop" hidden>停止生成</button></div>
+      <div class="row"><button id="chat">检索 + Agent 回答</button><button class="secondary" id="retrieve">只看召回</button><button class="secondary" id="stop" hidden>停止生成</button></div>
       <div class="status" id="query-status" role="status">尚未查询</div>
       <h3 class="answer-heading">Agent 回复</h3>
+      <div class="muted" id="answer-scope"></div>
       <div class="answer empty" id="answer">回答会显示在这里。</div>
       <div class="tool-activity" id="tool-activity" hidden>
         <h4 class="tool-heading">工具调用</h4>
@@ -95,12 +145,75 @@
       </details>
     </section>
   </div>
+  <div id="management-page" role="tabpanel" aria-labelledby="management-tab" tabindex="0" hidden>
+    <div class="page-heading"><h2>知识库管理</h2><p>为不同主题建立知识库，上传文档，查看实际入库的分块内容，再到聊天页面挂载资料。</p></div>
+    <div class="management-layout">
+      <section class="panel">
+        <h2>我的知识库</h2>
+        <p class="muted">选择库名查看文档。当前管理目标与聊天挂载范围互不影响。</p>
+        <div class="row"><button class="secondary" id="refresh-libraries">刷新知识库</button></div>
+        <div class="status" id="management-status" role="status">正在加载知识库…</div>
+        <div id="knowledge-bases"></div>
+        <div class="row pager"><button class="secondary" id="kb-prev">上一页</button><span id="kb-page"></span><button class="secondary" id="kb-next">下一页</button></div>
+        <div class="editor">
+          <h3>新建知识库</h3>
+          <label for="new-kb-name">知识库名称</label><input id="new-kb-name" maxlength="80" placeholder="例如：产品文档">
+          <label for="new-kb-description">知识库描述（可选）</label><textarea id="new-kb-description" maxlength="500" placeholder="这份知识库包含哪些资料？"></textarea>
+          <div class="row"><button id="create-kb">创建知识库</button></div>
+        </div>
+        <div class="editor" id="kb-editor" hidden>
+          <h3>修改当前知识库</h3>
+          <label for="edit-kb-name">当前知识库名称</label><input id="edit-kb-name" maxlength="80">
+          <label for="edit-kb-description">当前知识库描述</label><textarea id="edit-kb-description" maxlength="500"></textarea>
+          <div class="row"><button class="secondary" id="save-kb">保存修改</button><button class="danger" id="delete-kb">删除知识库</button></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>文档入库 · <span class="target-name" id="management-target">请选择知识库</span></h2>
+        <p class="muted">上传 PDF、DOCX、PPTX、XLSX、HTML、Markdown、TXT 或 CSV。上传目标与聊天的检索范围互不影响。</p>
+        <label for="file">选择文件</label>
+        <input id="file" type="file" accept=".pdf,.docx,.pptx,.xlsx,.html,.htm,.md,.txt,.csv">
+        <div class="row"><button id="upload">解析并入库</button><button class="secondary" id="refresh">刷新文档</button></div>
+        <div class="status" id="ingest-status" role="status">等待上传。入库后会展示文档和 chunk 数。</div>
+        <div id="documents"></div>
+        <div class="row pager"><button class="secondary" id="doc-prev">上一页</button><span id="doc-page"></span><button class="secondary" id="doc-next">下一页</button></div>
+      </section>
+    </div>
+    <section class="panel document-inspector" id="document-inspector" aria-labelledby="inspect-title" tabindex="-1" hidden>
+      <div class="doc-title">
+        <div><h2 id="inspect-title">文档分块</h2><div class="muted" id="inspect-document-meta"></div></div>
+        <div class="doc-actions"><button class="secondary" id="inspect-reload" type="button">刷新分块</button><button class="secondary" id="inspect-close" type="button">关闭详情</button></div>
+      </div>
+      <p class="muted">这里展示实际存入向量数据库的文本分块。检索和 Agent 读取的就是这些内容，原文件的排版可能不会保留。</p>
+      <div class="status" id="inspect-status" role="status"></div>
+      <button class="secondary" id="inspect-retry" type="button" hidden>重试加载</button>
+      <div class="inspect-layout" id="inspect-layout" hidden>
+        <aside class="inspect-directory" aria-label="当前页分块目录"><h3>分块目录 · 本页</h3><div id="inspect-directory"></div></aside>
+        <div class="inspect-content" id="inspect-content" aria-label="选中分块的完整内容"></div>
+      </div>
+      <div class="row pager inspect-pager" id="inspect-pager" hidden><button class="secondary" id="inspect-prev" type="button">上一页分块</button><span id="inspect-page"></span><button class="secondary" id="inspect-next" type="button">下一页分块</button></div>
+    </section>
+  </div>
 <script>
+const PAGE_SIZE = 10;
+const CHUNK_PAGE_SIZE = 12;
+const SCOPE_STORAGE_KEY = 'henan-rag.knowledge-base-selection.v1';
+const PAGE_NAMES = ['chat', 'management'];
+const toolRows = new Map();
+let knowledgeBases = new Map();
+let activeManagementKnowledgeBaseId = null;
+let selectedChatKnowledgeBaseIds = [];
+let managementBusy = false, queryBusy = false, scopeLoading = true;
+let scopeRestored = false, libraryGeneration = 0, documentGeneration = 0;
+let kbOffset = 0, kbTotal = 0, documentOffset = 0, documentTotal = 0;
+let activeController = null;
+let activePage = 'chat';
+let inspectedDocument = null, inspectedKnowledgeBase = null, inspectionPage = null;
+let inspectionGeneration = 0, inspectionController = null, inspectionLoading = false;
+let inspectionOffset = 0, inspectionHistory = [], selectedInspectionIndex = null;
+
 // 根据 CSS 选择器查找页面元素。selector：选择器字符串；返回首个匹配元素。
 function $(selector) { return document.querySelector(selector); }
-
-// 读取当前知识空间。无参数；返回用户输入的标识，空白时使用 default。
-function tenantId() { return $('#tenant').value.trim() || 'default'; }
 
 // 创建安全的 DOM 节点。tag：标签名；className：CSS 类；text：可选纯文本；返回元素。
 function node(tag, className, text) {
@@ -110,270 +223,832 @@ function node(tag, className, text) {
   return item;
 }
 
-// 发送普通 JSON API 请求。url：接口地址；options：fetch 配置；返回 Promise，完成值为解析后的 JSON，失败时拒绝。
+// 切换功能页。page：chat 或 management；focus：是否将键盘焦点移到对应 Tab；无返回值。
+// 只隐藏或显示现有面板，不重建 DOM、不取消上传或回答，两个页面的输入和状态均保留。
+function activatePage(page, focus = false) {
+  if (!PAGE_NAMES.includes(page)) return;
+  activePage = page;
+  for (const name of PAGE_NAMES) {
+    const selected = name === page, tab = $(`#${name}-tab`);
+    tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1;
+    $(`#${name}-page`).hidden = !selected;
+  }
+  if (focus) $(`#${page}-tab`).focus();
+}
+
+// 打开聊天页。无参数；无返回值，保留管理操作的进行状态。
+function openChatPage() { activatePage('chat'); }
+
+// 打开知识库管理页。无参数；无返回值，流式回答继续在原聊天 DOM 中更新。
+function openManagementPage() { activatePage('management'); }
+
+// 处理 Tab 键盘导航。event：keydown 事件；无返回值，左右方向键及 Home/End 切换并移动焦点。
+function navigateTabs(event) {
+  let index = PAGE_NAMES.indexOf(activePage);
+  if (event.key === 'ArrowRight') index = (index + 1) % PAGE_NAMES.length;
+  else if (event.key === 'ArrowLeft') index = (index - 1 + PAGE_NAMES.length) % PAGE_NAMES.length;
+  else if (event.key === 'Home') index = 0;
+  else if (event.key === 'End') index = PAGE_NAMES.length - 1;
+  else return;
+  event.preventDefault(); activatePage(PAGE_NAMES[index], true);
+}
+
+// 提供无法解析响应时的默认值。无参数；返回空对象，避免掩盖 HTTP 状态。
+function emptyResponse() { return {}; }
+
+// 解析新旧错误格式。detail：对象、字符串或校验错误数组；fallback：默认提示；返回可读文字。
+function errorMessage(detail, fallback = '请求失败，请重试。') {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) return detail.map(validationMessage).join('；') || fallback;
+  return detail && typeof detail.message === 'string' ? detail.message : fallback;
+}
+
+// 提取旧版校验错误。item：含 loc/msg 的字段错误；返回字段位置和原因组成的字符串。
+function validationMessage(item) {
+  return `${Array.isArray(item.loc) ? item.loc.join('.') + '：' : ''}${item.msg || '参数不合法'}`;
+}
+
+// 构造带业务代码的错误。detail：API detail 或 SSE error；fallback：默认提示；返回 Error。
+function responseError(detail, fallback) {
+  const error = new Error(errorMessage(detail, fallback));
+  error.code = detail && detail.code;
+  error.retryable = Boolean(detail && detail.retryable);
+  return error;
+}
+
+// 发送普通 API 请求。url：接口地址；options：fetch 配置；返回 Promise<JSON|null>。
+// 204 不解析空响应；失败抛出保留业务 code 的 Error，供页面判断范围是否失效。
 async function api(url, options = {}) {
   const response = await fetch(url, options);
+  if (response.status === 204 && response.ok) return null;
   const data = await response.json().catch(emptyResponse);
-  if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+  if (!response.ok) throw responseError(data.detail, `HTTP ${response.status}`);
   return data;
 }
 
-// 显示文档操作错误。error：请求异常；无返回值，更新上传区域的状态文字。
-function showIngestError(error) { $('#ingest-status').textContent = error.message; }
+// 创建 JSON 请求配置。method：HTTP 方法；body：请求对象；返回 fetch options。
+function jsonRequest(method, body) {
+  return {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)};
+}
 
-// 加载当前知识空间的文档列表。无参数；生成文档信息和删除按钮。
-// 返回 Promise，完成值为 undefined；请求失败时拒绝，由调用方处理。
-async function loadDocuments() {
-  const docs = await api(`/api/documents?tenant_id=${encodeURIComponent(tenantId())}`);
-  const root = $('#documents'); root.replaceChildren();
-  if (!docs.length) { root.append(node('p', 'muted', '还没有文档')); return; }
-  for (const doc of docs) {
-    const row = node('div', 'doc'); const title = node('div', 'doc-title');
-    title.append(node('strong', '', doc.source));
-    const del = node('button', 'danger', '删除');
-    // 删除当前列表项。无参数；闭包中的 doc 是这行文档，完成后刷新列表。
-    // 返回 Promise，完成值为 undefined；错误在函数内部展示到上传状态区域。
-    async function deleteDocument() {
-      try {
-        await api(`/api/documents/${encodeURIComponent(doc.document_id)}?tenant_id=${encodeURIComponent(tenantId())}`, {method:'DELETE'});
-        await loadDocuments();
-      } catch (error) { $('#ingest-status').textContent = error.message; }
+// 读取持久问答范围。无参数；返回 UUID 数组；未保存或存储不可读时返回 null。
+function readSavedScope() {
+  try {
+    const stored = localStorage.getItem(SCOPE_STORAGE_KEY);
+    if (stored === null) return null;
+    const value = JSON.parse(stored);
+    if (!Array.isArray(value)) return null;
+    return value.filter(isString);
+  } catch (error) { return null; }
+}
+
+// 检查已存选择项的类型。value：任意 JSON 值；返回是否为字符串。
+function isString(value) { return typeof value === 'string'; }
+
+// 保存聊天范围。无参数；无返回值；浏览器禁用存储时保留当前页面选择。
+function saveScope() {
+  try { localStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify(selectedChatKnowledgeBaseIds)); }
+  catch (error) { /* localStorage 不可用不影响本次查询。 */ }
+}
+
+// 根据完整可用库校验选择。ids：原选择；available：完整知识库 Map；返回全部去重后的 active ID。
+function validScope(ids, available) {
+  const result = [], seen = new Set();
+  for (const id of ids) {
+    if (!seen.has(id) && available.get(id)?.status === 'active') { seen.add(id); result.push(id); }
+  }
+  return result;
+}
+
+// 加载所有知识库分页。无参数；返回 Promise<Map<ID,库>>；必须全部成功才用于恢复问答选择。
+// offset 按实际返回项推进；空页、重复页、异常 total 或无进展时失败，不设置业务数量上限。
+async function loadAllKnowledgeBases() {
+  const result = new Map();
+  let offset = 0;
+  while (true) {
+    const page = await api(`/api/knowledge-bases?limit=200&offset=${offset}`);
+    if (!Array.isArray(page.items) || !Number.isSafeInteger(page.total) || page.total < 0) throw new Error('知识库分页数据无效，请刷新。');
+    if (!page.items.length && offset < page.total) throw new Error('知识库列表发生变化，请刷新重试。');
+    for (const kb of page.items) {
+      if (!kb || typeof kb.id !== 'string' || !kb.id) throw new Error('知识库分页数据无效，请刷新。');
+      if (result.has(kb.id)) throw new Error('知识库分页出现重复，请刷新重试。');
+      result.set(kb.id, kb);
     }
-    del.onclick = deleteDocument;
-    title.append(del); row.append(title, node('div', 'muted', `${doc.chunk_count} 个 chunks`)); root.append(row);
+    const nextOffset = offset + page.items.length;
+    if (nextOffset >= page.total) return result;
+    if (nextOffset <= offset || result.size < nextOffset) throw new Error('知识库分页出现重复，请刷新重试。');
+    offset = nextOffset;
   }
 }
 
-// 展示检索证据。chunks：后端返回的片段数组；无返回值，更新来源、分数和原文。
+// 转换库和文档状态。status：后端状态码；返回中文状态标签。
+function statusLabel(status) {
+  const labels = {active:'可用', importing:'处理中', ready:'已入库', failed:'入库失败', cleanup_required:'待清理', deleting:'删除中', delete_failed:'删除失败'};
+  return labels[status] || status;
+}
+
+// 读取当前管理目标。无参数；返回知识库对象，目标失效时返回 undefined。
+function managementTarget() { return knowledgeBases.get(activeManagementKnowledgeBaseId); }
+
+// 同步所有按钮和分页控件。无参数；无返回值；管理操作和问答使用独立锁。
+function syncControls() {
+  const target = managementTarget();
+  for (const id of ['create-kb','refresh-libraries','new-kb-name','new-kb-description','edit-kb-name','edit-kb-description']) {
+    $(`#${id}`).disabled = managementBusy;
+  }
+  $('#save-kb').disabled = managementBusy || !target || target.status !== 'active';
+  $('#delete-kb').disabled = managementBusy || !target || target.is_default;
+  $('#file').disabled = managementBusy || !target || target.status !== 'active';
+  $('#upload').disabled = managementBusy || !target || target.status !== 'active';
+  $('#refresh').disabled = managementBusy || !target;
+  $('#kb-prev').disabled = managementBusy || kbOffset <= 0;
+  $('#kb-next').disabled = managementBusy || kbOffset + PAGE_SIZE >= kbTotal;
+  $('#doc-prev').disabled = managementBusy || !target || documentOffset <= 0;
+  $('#doc-next').disabled = managementBusy || !target || documentOffset + PAGE_SIZE >= documentTotal;
+  for (const button of $('#knowledge-bases').querySelectorAll('button')) button.disabled = managementBusy;
+  for (const button of $('#documents').querySelectorAll('button')) button.disabled = managementBusy;
+  for (const checkbox of $('#chat-scope').querySelectorAll('input')) checkbox.disabled = queryBusy || scopeLoading;
+  $('#select-all-scope').disabled = queryBusy || scopeLoading;
+  $('#clear-scope').disabled = queryBusy || scopeLoading || !selectedChatKnowledgeBaseIds.length;
+  $('#refresh-scope').disabled = managementBusy || scopeLoading;
+  $('#chat').disabled = queryBusy || scopeLoading || !selectedChatKnowledgeBaseIds.length;
+  $('#retrieve').disabled = queryBusy || scopeLoading || !selectedChatKnowledgeBaseIds.length;
+  $('#chat').textContent = queryBusy && activeController ? '回答中…' : '检索 + Agent 回答';
+  syncInspectionControls();
+}
+
+// 控制管理写操作。busy：是否正在上传/创建/修改/删除；无返回值。
+function setManagementBusy(busy) { managementBusy = busy; syncControls(); }
+
+// 渲染当前管理目标及编辑表单。无参数；无返回值；库 ID 只保留在内部状态中。
+function renderManagementTarget() {
+  const kb = managementTarget();
+  if (inspectedKnowledgeBase && (inspectedKnowledgeBase.id !== activeManagementKnowledgeBaseId || kb?.status !== 'active')) closeDocumentInspection();
+  else if (inspectedKnowledgeBase && kb) { inspectedKnowledgeBase = kb; renderInspectionHeader(); }
+  $('#management-target').textContent = kb ? kb.name : '请选择知识库';
+  $('#kb-editor').hidden = !kb;
+  $('#edit-kb-name').value = kb ? kb.name : '';
+  $('#edit-kb-description').value = kb ? kb.description : '';
+  $('#delete-kb').textContent = kb && kb.status !== 'active' ? '继续删除知识库' : '删除知识库';
+  $('#delete-kb').title = kb && kb.is_default ? '默认知识库可以修改和清空文档，但不能删除。' : '';
+  for (const button of $('#knowledge-bases').querySelectorAll('button')) {
+    const current = button.dataset.knowledgeBaseId === activeManagementKnowledgeBaseId;
+    button.setAttribute('aria-pressed', String(current));
+    button.parentElement.classList.toggle('current', current);
+  }
+  syncControls();
+}
+
+// 显示管理列表的一页。items：当前页知识库数组；无返回值，名称按钮切换管理目标。
+function renderKnowledgeBases(items) {
+  const root = $('#knowledge-bases'); root.replaceChildren();
+  if (!items.length) root.append(node('p', 'muted', '这一页没有知识库。'));
+  for (const kb of items) {
+    const row = node('div', 'kb');
+    const select = node('button', 'kb-name', kb.name);
+    select.dataset.knowledgeBaseId = kb.id;
+    // 切换此行对应的管理库。无参数；返回 Promise<void>；错误在管理状态中展示。
+    async function selectThisKnowledgeBase() {
+      if (managementBusy) return;
+      activeManagementKnowledgeBaseId = kb.id; documentOffset = 0;
+      $('#file').value = '';
+      $('#ingest-status').textContent = `上传目标：${kb.name}。`;
+      renderManagementTarget();
+      try { await loadDocuments(); } catch (error) { showIngestError(error); }
+    }
+    select.onclick = selectThisKnowledgeBase;
+    row.append(select, node('span', 'badge status-badge', kb.is_default ? '默认库' : statusLabel(kb.status)));
+    row.append(node('div', 'muted', `${kb.document_count} 份已入库文档 · ${kb.chunk_count} 个 chunks`));
+    if (kb.description) row.append(node('div', 'muted kb-description', kb.description));
+    if (kb.last_error) row.append(node('div', 'muted error-text', kb.last_error));
+    root.append(row);
+  }
+  $('#kb-page').textContent = `第 ${Math.floor(kbOffset / PAGE_SIZE) + 1} 页 · 共 ${kbTotal} 个库`;
+  renderManagementTarget();
+}
+
+// 渲染聊天挂载范围。无参数；无返回值；按搜索条件展示 active 库，隐藏的库保持原选择。
+function renderChatScope() {
+  const root = $('#chat-scope'); root.replaceChildren();
+  const search = $('#scope-search').value.trim().toLocaleLowerCase(), selected = new Set(selectedChatKnowledgeBaseIds);
+  let availableCount = 0, visibleCount = 0;
+  for (const kb of knowledgeBases.values()) {
+    if (kb.status !== 'active') continue;
+    availableCount += 1;
+    if (search && !`${kb.name} ${kb.description || ''}`.toLocaleLowerCase().includes(search)) continue;
+    visibleCount += 1;
+    const label = node('label', 'chat-choice');
+    const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.value = kb.id;
+    checkbox.checked = selected.has(kb.id);
+    // 更新此库的挂载选择。无参数；无返回值；查询期间恢复快照选择，库数量不受业务上限限制。
+    function changeKnowledgeBaseSelection() {
+      if (queryBusy || scopeLoading) { checkbox.checked = selectedChatKnowledgeBaseIds.includes(kb.id); return; }
+      if (checkbox.checked && !selectedChatKnowledgeBaseIds.includes(kb.id)) {
+        selectedChatKnowledgeBaseIds.push(kb.id);
+      } else if (!checkbox.checked) {
+        selectedChatKnowledgeBaseIds = selectedChatKnowledgeBaseIds.filter(keepOtherId);
+      }
+      // 保留其他库的选择。id：数组中的库 ID；返回是否不同于闭包中的 kb.id。
+      function keepOtherId(id) { return id !== kb.id; }
+      saveScope(); updateScopeLabel(); syncControls();
+    }
+    checkbox.onchange = changeKnowledgeBaseSelection;
+    label.append(checkbox, node('span', '', `${kb.name}${kb.is_default ? '（默认）' : ''}`));
+    root.append(label);
+  }
+  if (!root.children.length) root.append(node('p', 'muted', search ? '没有匹配的可用知识库。' : '暂无可用知识库。'));
+  $('#scope-search-results').hidden = !search;
+  $('#scope-search-results').textContent = `找到 ${visibleCount} 个 · 共 ${availableCount} 个可用知识库`;
+  updateScopeLabel(); syncControls();
+}
+
+// 搜索可挂载的库。无参数；无返回值，仅刷新可见选项，不改变任何已选范围。
+function searchChatScope() { renderChatScope(); }
+
+// 挂载所有可用知识库。无参数；无返回值；包含搜索未显示的库，查询中不修改选择。
+function selectAllChatScope() {
+  if (queryBusy || scopeLoading) return;
+  selectedChatKnowledgeBaseIds = [];
+  for (const kb of knowledgeBases.values()) if (kb.status === 'active') selectedChatKnowledgeBaseIds.push(kb.id);
+  saveScope(); renderChatScope();
+}
+
+// 清空聊天挂载范围。无参数；无返回值；不自动回退到默认库，查询中不修改选择。
+function clearChatScope() {
+  if (queryBusy || scopeLoading) return;
+  selectedChatKnowledgeBaseIds = []; saveScope(); renderChatScope();
+}
+
+// 生成库名称说明。ids：知识库 ID 数组；返回用顿号连接的名称，失效项不显示 UUID。
+function scopeNames(ids) {
+  const names = [];
+  for (const id of ids) { const kb = knowledgeBases.get(id); if (kb) names.push(kb.name); }
+  return names.join('、');
+}
+
+// 生成简短的挂载名称摘要。ids：本次知识库 ID 数组；返回前 5 个库名及剩余数量，不修改实际范围。
+function scopePreview(ids) {
+  const shown = ids.slice(0, 5), remaining = ids.length - shown.length;
+  return `${scopeNames(shown)}${remaining ? `，另有 ${remaining} 个知识库` : ''}`;
+}
+
+// 更新当前选择提示。无参数；无返回值；空选择保持为空，不自动切换知识库。
+function updateScopeLabel() {
+  const shown = selectedChatKnowledgeBaseIds.slice(0, 5), remaining = selectedChatKnowledgeBaseIds.length - shown.length;
+  $('#selected-scope').textContent = selectedChatKnowledgeBaseIds.length
+    ? `已挂载 ${selectedChatKnowledgeBaseIds.length} 个：${scopeNames(shown)}${remaining ? `，另有 ${remaining} 个` : ''}`
+    : '请选择至少一个知识库。';
+}
+
+// 刷新管理页和完整选择器。无参数；返回 Promise<void>；失败时不丢弃旧选择。
+// generation 防止较旧响应覆盖新刷新；首次才默认选择默认库，已保存空数组保持为空。
+async function refreshKnowledgeBases() {
+  const generation = ++libraryGeneration;
+  scopeLoading = true; syncControls();
+  try {
+    const [page, all] = await Promise.all([api(`/api/knowledge-bases?limit=${PAGE_SIZE}&offset=${kbOffset}`), loadAllKnowledgeBases()]);
+    if (generation !== libraryGeneration) return;
+    if (!page.items.length && page.total > 0 && kbOffset >= page.total) {
+      kbOffset = Math.floor((page.total - 1) / PAGE_SIZE) * PAGE_SIZE;
+      return await refreshKnowledgeBases();
+    }
+    knowledgeBases = all; kbTotal = page.total;
+    const previous = [...selectedChatKnowledgeBaseIds];
+    if (!scopeRestored) {
+      const saved = readSavedScope();
+      selectedChatKnowledgeBaseIds = validScope(saved === null ? [page.default_knowledge_base_id] : saved, all);
+      scopeRestored = true;
+    } else selectedChatKnowledgeBaseIds = validScope(previous, all);
+    if (!all.has(activeManagementKnowledgeBaseId)) {
+      activeManagementKnowledgeBaseId = all.has(page.default_knowledge_base_id) ? page.default_knowledge_base_id : null;
+      documentOffset = 0;
+    }
+    if (inspectedKnowledgeBase && (!all.has(inspectedKnowledgeBase.id) || all.get(inspectedKnowledgeBase.id).status !== 'active')) closeDocumentInspection();
+    saveScope(); renderKnowledgeBases(page.items); renderChatScope();
+    const removed = previous.length && previous.some(scopeWasRemoved);
+    // 检查旧挂载是否被删除或停用。id：原选中 ID；返回新范围中是否已没有它。
+    function scopeWasRemoved(id) { return !selectedChatKnowledgeBaseIds.includes(id); }
+    $('#management-status').textContent = removed ? '列表已刷新；已移除删除或不可用的聊天知识库。' : '选择库名可管理文档；到“聊天”页面单独选择挂载范围。';
+  } finally {
+    if (generation === libraryGeneration) { scopeLoading = false; syncControls(); }
+  }
+}
+
+// 展示管理操作错误。error：请求异常；无返回值，更新管理状态。
+function showManagementError(error) { $('#management-status').textContent = `失败：${error.message}`; }
+
+// 展示文档操作错误。error：请求异常；无返回值，更新上传状态。
+function showIngestError(error) { $('#ingest-status').textContent = `失败：${error.message}`; }
+
+// 新建知识库。无参数；返回 Promise<void>；创建后切到新库管理，聊天范围保持不变。
+async function createKnowledgeBase() {
+  if (managementBusy) return;
+  const name = $('#new-kb-name').value.trim(), description = $('#new-kb-description').value.trim();
+  if (!name) { $('#management-status').textContent = '请填写知识库名称。'; return; }
+  setManagementBusy(true); $('#management-status').textContent = '正在创建知识库…';
+  try {
+    const kb = await api('/api/knowledge-bases', jsonRequest('POST', {name, description}));
+    activeManagementKnowledgeBaseId = kb.id; documentOffset = 0; kbOffset = 0;
+    $('#new-kb-name').value = ''; $('#new-kb-description').value = ''; $('#file').value = '';
+    await refreshKnowledgeBases(); await loadDocuments();
+    $('#management-status').textContent = `已创建「${kb.name}」。到“聊天”页面即可勾选挂载。`;
+    $('#ingest-status').textContent = `上传目标：${kb.name}。`;
+  } catch (error) { showManagementError(error); }
+  finally { setManagementBusy(false); }
+}
+
+// 修改当前库名称与描述。无参数；返回 Promise<void>；捕获 ID，重命名不改变文档或挂载范围。
+async function updateKnowledgeBase() {
+  const kb = managementTarget(); if (managementBusy || !kb || kb.status !== 'active') return;
+  const name = $('#edit-kb-name').value.trim(), description = $('#edit-kb-description').value.trim();
+  if (!name) { $('#management-status').textContent = '知识库名称不能为空。'; return; }
+  setManagementBusy(true);
+  try {
+    const changed = await api(`/api/knowledge-bases/${encodeURIComponent(kb.id)}`, jsonRequest('PATCH', {name, description}));
+    await refreshKnowledgeBases();
+    $('#management-status').textContent = `已保存「${changed.name}」；已有文档和知识库 ID 保持不变。`;
+  } catch (error) { showManagementError(error); }
+  finally { setManagementBusy(false); }
+}
+
+// 删除当前知识库。无参数；返回 Promise<void>；确认级联删除，默认库受保护，失败可继续删除。
+async function deleteKnowledgeBase() {
+  const kb = managementTarget(); if (managementBusy || !kb || kb.is_default) return;
+  if (!confirm(`确定删除知识库「${kb.name}」吗？\n会删除其中的全部文档、原文件与向量（已入库 ${kb.document_count} 份文档）。此操作无法撤销。`)) return;
+  if (inspectedKnowledgeBase?.id === kb.id) closeDocumentInspection();
+  setManagementBusy(true); $('#management-status').textContent = `正在删除「${kb.name}」…`;
+  try {
+    await api(`/api/knowledge-bases/${encodeURIComponent(kb.id)}`, {method:'DELETE'});
+    activeManagementKnowledgeBaseId = null; documentOffset = 0; $('#file').value = '';
+    await refreshKnowledgeBases(); await loadDocuments();
+    $('#management-status').textContent = `已删除「${kb.name}」及其中的文档与向量。`;
+  } catch (error) {
+    showManagementError(error);
+    await refreshAfterFailure(); showManagementError(error);
+  } finally { setManagementBusy(false); }
+}
+
+// 操作失败后同步状态。无参数；返回 Promise<void>；刷新本身失败时保留原错误。
+async function refreshAfterFailure() {
+  try { await refreshKnowledgeBases(); await loadDocuments(); }
+  catch (error) { /* 调用方展示原操作错误，下一次手动刷新可重新同步。 */ }
+}
+
+// 加载当前管理库的文档页。无参数；返回 Promise<void>；目标或 generation 变化时忽略旧响应。
+async function loadDocuments() {
+  const id = activeManagementKnowledgeBaseId, offset = documentOffset, generation = ++documentGeneration;
+  const root = $('#documents');
+  root.replaceChildren(node('p', 'muted', id ? '正在加载文档…' : '请先选择知识库。'));
+  if (!id) { documentTotal = 0; $('#doc-page').textContent = ''; syncControls(); return; }
+  let page;
+  try {
+    page = await api(`/api/knowledge-bases/${encodeURIComponent(id)}/documents?limit=${PAGE_SIZE}&offset=${offset}`);
+  } catch (error) {
+    if (generation !== documentGeneration || id !== activeManagementKnowledgeBaseId || offset !== documentOffset) return;
+    throw error;
+  }
+  if (generation !== documentGeneration || id !== activeManagementKnowledgeBaseId || offset !== documentOffset) return;
+  if (!page.items.length && page.total > 0 && offset >= page.total) {
+    documentOffset = Math.floor((page.total - 1) / PAGE_SIZE) * PAGE_SIZE; return await loadDocuments();
+  }
+  documentTotal = page.total; root.replaceChildren();
+  if (!page.items.length) root.append(node('p', 'muted', '这个知识库还没有文档。'));
+  for (const doc of page.items) {
+    const row = node('div', 'doc'), title = node('div', 'doc-title');
+    row.dataset.documentId = doc.document_id;
+    title.append(node('strong', '', doc.source));
+    const actions = node('div', 'doc-actions');
+    if (doc.status === 'ready') {
+      const inspect = node('button', 'secondary', '查看分块'); inspect.type = 'button';
+      // 查看此行文档的实际入库分块。无参数；返回 Promise<void>，闭包 id/doc 保持库和文档的对应关系。
+      async function inspectThisDocument() { if (!managementBusy && id === activeManagementKnowledgeBaseId) await inspectDocument(id, doc); }
+      inspect.onclick = inspectThisDocument; actions.append(inspect);
+    }
+    const deleting = ['cleanup_required','deleting','delete_failed'].includes(doc.status);
+    const del = node('button', 'danger', deleting ? '清理 / 继续删除' : '删除');
+    // 删除这一份文档。无参数；返回 Promise<void>；闭包 id/doc 锁定归属，避免切库后误删。
+    async function deleteThisDocument() {
+      if (managementBusy) return;
+      const kb = knowledgeBases.get(id);
+      if (!confirm(`确定删除「${kb ? kb.name : '该知识库'}」中的文档「${doc.source}」吗？\n会清理这份文档的原文件与向量。`)) return;
+      if (inspectedKnowledgeBase?.id === id && inspectedDocument?.document_id === doc.document_id) closeDocumentInspection();
+      setManagementBusy(true);
+      try {
+        await api(`/api/knowledge-bases/${encodeURIComponent(id)}/documents/${encodeURIComponent(doc.document_id)}`, {method:'DELETE'});
+        await refreshKnowledgeBases(); await loadDocuments();
+        $('#ingest-status').textContent = `已删除「${doc.source}」。`;
+      } catch (error) { await refreshAfterFailure(); showIngestError(error); }
+      finally { setManagementBusy(false); }
+    }
+    del.onclick = deleteThisDocument; actions.append(del); title.append(actions);
+    row.append(title, node('div', 'muted', `${statusLabel(doc.status)} · ${doc.chunk_count} 个 chunks${doc.file_available ? '' : ' · 原文件不可用'}`));
+    if (doc.last_error) row.append(node('div', 'muted error-text', doc.last_error));
+    if (doc.status !== 'ready') row.append(node('div', 'muted', '文档成功入库后可查看实际分块内容。'));
+    if (inspectedKnowledgeBase?.id === id && inspectedDocument?.document_id === doc.document_id) {
+      if (doc.status !== 'ready') closeDocumentInspection();
+      else { inspectedDocument = doc; renderInspectionHeader(); }
+    }
+    root.append(row);
+  }
+  markInspectedDocument();
+  $('#doc-page').textContent = `第 ${Math.floor(offset / PAGE_SIZE) + 1} 页 · 共 ${page.total} 份文档`;
+  syncControls();
+}
+
+// 上传选中的文件。无参数；返回 Promise<void>；捕获目标 ID/名称，上传期间锁住管理切换。
+async function uploadDocument() {
+  const kb = managementTarget(); if (managementBusy || !kb || kb.status !== 'active') return;
+  const file = $('#file').files[0]; if (!file) { $('#ingest-status').textContent = '请先选择文件。'; return; }
+  const data = new FormData(); data.append('file', file);
+  setManagementBusy(true); $('#ingest-status').textContent = `正在向「${kb.name}」入库：Docling 解析和 embedding 中…`;
+  try {
+    const result = await api(`/api/knowledge-bases/${encodeURIComponent(kb.id)}/documents`, {method:'POST', body:data});
+    documentOffset = 0; $('#file').value = '';
+    await refreshKnowledgeBases(); await loadDocuments();
+    $('#ingest-status').textContent = `已入库到「${kb.name}」：${result.source} · ${result.chunk_count} 个 chunks。`;
+  } catch (error) { await refreshAfterFailure(); showIngestError(error); }
+  finally { setManagementBusy(false); }
+}
+
+// 同步文档详情按钮。无参数；无返回值；加载和写操作期间禁用分页，不影响聊天操作。
+function syncInspectionControls() {
+  const unavailable = managementBusy || inspectionLoading || !inspectedDocument;
+  $('#inspect-reload').disabled = unavailable;
+  $('#inspect-retry').disabled = unavailable;
+  $('#inspect-prev').disabled = unavailable || !inspectionPage || !inspectionHistory.length;
+  $('#inspect-next').disabled = unavailable || !inspectionPage || inspectionPage.next_offset === null;
+  for (const button of $('#inspect-directory').querySelectorAll('button')) button.disabled = unavailable;
+}
+
+// 标记当前查看的文档行。无参数；无返回值，不改变文档列表的分页或删除控件。
+function markInspectedDocument() {
+  for (const row of $('#documents').children) {
+    const selected = inspectedKnowledgeBase?.id === activeManagementKnowledgeBaseId && row.dataset.documentId === inspectedDocument?.document_id;
+    row.classList.toggle('inspecting', selected);
+    for (const button of row.querySelectorAll('button')) if (button.textContent === '查看分块') button.setAttribute('aria-pressed', String(selected));
+  }
+}
+
+// 显示文档标题与登记信息。无参数；无返回值，名称始终通过纯文本输出。
+function renderInspectionHeader() {
+  if (!inspectedDocument) return;
+  $('#inspect-title').textContent = `文档分块 · ${inspectedDocument.source}`;
+  $('#inspect-document-meta').textContent = `${inspectedKnowledgeBase?.name || '当前知识库'} · ${statusLabel(inspectedDocument.status)} · 文档登记 ${inspectedDocument.chunk_count} 个分块`;
+}
+
+// 关闭详情并使在途请求失效。无参数；无返回值，切库、删除或主动关闭时清除原文和存储信息。
+function closeDocumentInspection() {
+  inspectionGeneration += 1; if (inspectionController) inspectionController.abort(); inspectionController = null;
+  inspectedDocument = null; inspectedKnowledgeBase = null; inspectionPage = null; inspectionLoading = false;
+  inspectionOffset = 0; inspectionHistory = []; selectedInspectionIndex = null;
+  $('#document-inspector').hidden = true; $('#document-inspector').setAttribute('aria-busy', 'false');
+  $('#inspect-title').textContent = '文档分块'; $('#inspect-document-meta').textContent = ''; $('#inspect-status').textContent = '';
+  $('#inspect-directory').replaceChildren(); $('#inspect-content').replaceChildren();
+  $('#inspect-layout').hidden = true; $('#inspect-pager').hidden = true; $('#inspect-retry').hidden = true;
+  markInspectedDocument(); syncInspectionControls();
+}
+
+// 打开文档分块面板。knowledgeBaseId：文档所属库；doc：文档摘要；返回 Promise<void>，只请求第一页。
+async function inspectDocument(knowledgeBaseId, doc) {
+  if (managementBusy || knowledgeBaseId !== activeManagementKnowledgeBaseId) return;
+  closeDocumentInspection();
+  inspectedDocument = doc; inspectedKnowledgeBase = knowledgeBases.get(knowledgeBaseId) || {id:knowledgeBaseId,name:'当前知识库'};
+  $('#document-inspector').hidden = false; renderInspectionHeader(); markInspectedDocument();
+  $('#document-inspector').focus();
+  if (doc.status !== 'ready') { $('#inspect-status').textContent = '这份文档尚未成功入库，暂时没有可查看的分块。'; syncInspectionControls(); return; }
+  await loadInspectionPage(0, []);
+}
+
+// 检查分块页协议。page：后端 JSON；offset：本次索引游标；knowledgeBaseId/documentId：捕获的目标 ID；无返回值，异常页抛出可重试错误。
+function validateInspectionPage(page, offset, knowledgeBaseId, documentId) {
+  if (page?.document?.document_id !== documentId || page.document.knowledge_base_id !== knowledgeBaseId || page.knowledge_base?.id !== knowledgeBaseId) throw new Error('分块响应与当前文档不匹配，请重试。');
+  if (!page || !Array.isArray(page.items) || !Number.isSafeInteger(page.total) || page.total < 0 ||
+      !(page.next_offset === null || Number.isSafeInteger(page.next_offset) && page.next_offset > offset)) throw new Error('分块分页数据无效，请重试。');
+  let previousIndex = offset - 1;
+  for (const chunk of page.items) {
+    if (!Number.isSafeInteger(chunk.chunk_index) || chunk.chunk_index <= previousIndex || typeof chunk.text !== 'string') throw new Error('分块顺序或内容无效，请重试。');
+    previousIndex = chunk.chunk_index;
+  }
+  if (page.next_offset !== null && (!page.items.length || page.next_offset <= previousIndex)) throw new Error('分块分页未向前推进，请重试。');
+}
+
+// 请求实际存储的一个分块页。offset：chunk_index 起始游标；history：前页游标栈；返回 Promise<void>。
+// 请求代次与库/文档快照共同阻止乱序响应；分页按服务器游标推进，既不按 UUID 排序也不拉取全部数据。
+async function loadInspectionPage(offset, history) {
+  if (!inspectedDocument || !inspectedKnowledgeBase) return;
+  const documentId = inspectedDocument.document_id, knowledgeBaseId = inspectedKnowledgeBase.id, generation = ++inspectionGeneration;
+  if (inspectionController) inspectionController.abort();
+  const controller = new AbortController(); inspectionController = controller; inspectionLoading = true;
+  inspectionOffset = offset; inspectionHistory = [...history];
+  $('#document-inspector').setAttribute('aria-busy', 'true'); $('#inspect-status').textContent = '正在读取实际入库的分块…';
+  $('#inspect-layout').hidden = true; $('#inspect-pager').hidden = true; $('#inspect-retry').hidden = true;
+  $('#inspect-directory').replaceChildren(); $('#inspect-content').replaceChildren(); syncInspectionControls();
+  // 判断响应仍属于当前文档。无参数；返回是否与请求时的库、文档及代次一致。
+  function currentInspection() {
+    return generation === inspectionGeneration && knowledgeBaseId === activeManagementKnowledgeBaseId &&
+      knowledgeBaseId === inspectedKnowledgeBase?.id && documentId === inspectedDocument?.document_id;
+  }
+  try {
+    const page = await api(`/api/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/${encodeURIComponent(documentId)}/chunks?limit=${CHUNK_PAGE_SIZE}&offset=${offset}`, {signal:controller.signal});
+    if (!currentInspection()) return;
+    validateInspectionPage(page, offset, knowledgeBaseId, documentId);
+    inspectedDocument = page.document; inspectedKnowledgeBase = page.knowledge_base;
+    inspectionPage = page; inspectionOffset = offset; inspectionHistory = [...history];
+    renderInspectionHeader(); renderInspectionPage();
+  } catch (error) {
+    if (!currentInspection()) return;
+    inspectionPage = null; selectedInspectionIndex = null;
+    $('#inspect-status').textContent = `分块加载失败：${error.message}`; $('#inspect-retry').hidden = false;
+  } finally {
+    if (currentInspection()) {
+      inspectionLoading = false; inspectionController = null;
+      $('#document-inspector').setAttribute('aria-busy', 'false'); syncInspectionControls();
+    }
+  }
+}
+
+// 渲染当前页的目录与第一块原文。无参数；无返回值，DOM 仅包含本页最多 12 个分块。
+function renderInspectionPage() {
+  const page = inspectionPage, root = $('#inspect-directory'); root.replaceChildren();
+  $('#inspect-status').textContent = page.items.length ? `实际存储 ${page.total} 个分块 · 当前页 ${page.items.length} 个。选择左侧目录查看完整文本。` : '这份文档没有可展示的已入库分块。';
+  $('#inspect-layout').hidden = !page.items.length; $('#inspect-pager').hidden = !page.items.length && !inspectionHistory.length;
+  $('#inspect-page').textContent = `第 ${inspectionHistory.length + 1} 页 · 共 ${page.total} 个分块`;
+  for (const chunk of page.items) {
+    const choice = node('button', 'inspect-choice'); choice.type = 'button'; choice.dataset.chunkIndex = String(chunk.chunk_index);
+    choice.append(node('strong', '', `分块 #${chunk.chunk_index + 1} · ${chunk.character_count} 字符`));
+    choice.append(node('span', '', chunk.text.replace(/\s+/g, ' ').slice(0, 96) || '（空文本）'));
+    // 查看这一块。无参数；无返回值，读取当前页已有数据而不发起额外请求。
+    function selectThisChunk() { if (!managementBusy && !inspectionLoading) selectInspectionChunk(chunk.chunk_index); }
+    choice.onclick = selectThisChunk; root.append(choice);
+  }
+  if (page.items.length) selectInspectionChunk(page.items[0].chunk_index);
+}
+
+// 显示所选分块的完整纯文本和折叠存储详情。chunkIndex：原始 0 起始索引；无返回值。
+function selectInspectionChunk(chunkIndex) {
+  const chunk = inspectionPage?.items.find(matchesIndex); if (!chunk) return;
+  // 在当前页查找块索引。item：分块 DTO；返回是否与请求索引一致。
+  function matchesIndex(item) { return item.chunk_index === chunkIndex; }
+  selectedInspectionIndex = chunkIndex;
+  for (const choice of $('#inspect-directory').querySelectorAll('button')) choice.setAttribute('aria-pressed', String(Number(choice.dataset.chunkIndex) === chunkIndex));
+  const root = $('#inspect-content'); root.replaceChildren();
+  root.append(node('h3', '', `分块 #${chunkIndex + 1} · 完整文本`));
+  root.append(node('div', 'muted', `${chunk.character_count} 字符 · 原始 chunk_index = ${chunkIndex}（从 0 开始）`));
+  root.append(node('div', 'stored-text', chunk.text || '（此块文本为空）'));
+  const details = node('details', 'storage-details'); details.append(node('summary', '', '存储详情 · 元数据与向量预览'));
+  const fields = node('dl', 'storage-fields');
+  const values = [['Point ID', chunk.point_id],['知识库 ID', inspectedKnowledgeBase.id],['文档 ID', inspectedDocument.document_id],
+    ['chunk_index', chunk.chunk_index],['indexing_state', chunk.indexing_state],['向量维数', chunk.vector_dimensions]];
+  for (const [name, value] of values) fields.append(node('dt', '', name), node('dd', '', value === null || value === undefined ? '未提供' : String(value)));
+  details.append(fields, node('p', 'muted', '向量前 8 维预览（完整向量仍保存在数据库中）：'));
+  details.append(node('pre', 'storage-json', JSON.stringify(chunk.vector_preview || [])));
+  details.append(node('p', 'muted', '实际存储的 payload（含文本和元数据）：'), node('pre', 'storage-json', JSON.stringify(chunk.payload || {}, null, 2)));
+  root.append(details);
+}
+
+// 加载下一页分块。无参数；返回 Promise<void>，使用后端 next_offset，允许索引存在空洞。
+async function nextInspectionPage() {
+  if (managementBusy || inspectionLoading || !inspectionPage || inspectionPage.next_offset === null) return;
+  await loadInspectionPage(inspectionPage.next_offset, [...inspectionHistory, inspectionOffset]);
+}
+
+// 返回上一页分块。无参数；返回 Promise<void>，使用已保存的游标而非减去页大小。
+async function previousInspectionPage() {
+  if (managementBusy || inspectionLoading || !inspectionHistory.length) return;
+  const history = [...inspectionHistory], offset = history.pop(); await loadInspectionPage(offset, history);
+}
+
+// 刷新当前页或重试失败请求。无参数；返回 Promise<void>，保留文档目标和已成功的分页位置。
+async function reloadDocumentInspection() {
+  if (managementBusy || inspectionLoading || !inspectedDocument) return;
+  if (inspectedDocument.status !== 'ready') { $('#inspect-status').textContent = '这份文档尚未成功入库，暂时没有可查看的分块。'; return; }
+  await loadInspectionPage(inspectionOffset, inspectionHistory);
+}
+
+// 显示召回证据。chunks：带库名称、文档、分数和原文的片段数组；无返回值。
 function renderChunks(chunks) {
-  const root = $('#chunks'); root.replaceChildren(); $('#hit-count').textContent = chunks.length ? `（${chunks.length} 条）` : '（0 条）';
+  const root = $('#chunks'); root.replaceChildren(); $('#hit-count').textContent = `（${chunks.length} 条）`;
   for (const [index, chunk] of chunks.entries()) {
-    const card = node('div', 'chunk'); const head = node('div', 'chunk-head');
-    head.append(node('span', '', `[${index + 1}] ${chunk.source} · chunk ${chunk.chunk_index}`));
+    const card = node('div', 'chunk'), head = node('div', 'chunk-head');
+    head.append(node('span', '', `[${index + 1}] ${chunk.knowledge_base_name} / ${chunk.source} · chunk ${chunk.chunk_index}`));
     head.append(node('span', '', `score ${Number(chunk.score).toFixed(4)}`));
     card.append(head, node('div', 'chunk-text', chunk.text)); root.append(card);
   }
 }
 
-// 上传选中的文件。无参数；读取文件和知识空间，成功后展示入库结果并刷新列表。
-// 返回 Promise，完成值为 undefined；上传错误在函数内部展示。
-async function uploadDocument() {
-  const file = $('#file').files[0]; if (!file) { $('#ingest-status').textContent = '请先选择文件'; return; }
-  const data = new FormData(); data.append('file', file); data.append('tenant_id', tenantId());
-  $('#ingest-status').textContent = 'Docling 解析和 embedding 中…';
-  try {
-    const result = await api('/api/ingest/file', {method:'POST', body:data});
-    $('#ingest-status').textContent = `已入库：${result.source} · ${result.chunk_count} 个 chunks · document_id ${result.document_id}`;
-    await loadDocuments();
-  } catch (error) { $('#ingest-status').textContent = `失败：${error.message}`; }
+// 控制查询交互。busy：查询是否进行；streaming：是否显示停止按钮；无返回值。
+function setQueryBusy(busy, streaming = false) {
+  queryBusy = busy; $('#stop').hidden = !busy || !streaming; $('#stop').disabled = false;
+  $('#answer').setAttribute('aria-busy', String(busy && streaming)); syncControls();
 }
 
-const toolRows = new Map();
-let activeController = null;
-
-// 控制查询期间的交互。busy：是否执行中；streaming：是否可停止的流式回答；无返回值。
-function setQueryBusy(busy, streaming = false) {
-  $('#chat').disabled = busy;
-  $('#retrieve').disabled = busy;
-  $('#tenant').disabled = busy;
-  $('#stop').hidden = !busy || !streaming;
-  $('#stop').disabled = false;
-  $('#chat').textContent = busy && streaming ? '回答中…' : '检索 + Agent 回答';
-  $('#answer').setAttribute('aria-busy', String(busy && streaming));
+// 构造当前查询。无参数；返回请求 JSON 或 null；拒绝空问题和空挂载范围。
+function queryPayload() {
+  if (queryBusy || scopeLoading) return null;
+  if (!selectedChatKnowledgeBaseIds.length) { $('#query-status').textContent = '请选择至少一个知识库。'; return null; }
+  const question = $('#question').value.trim();
+  if (!question) { $('#query-status').textContent = '请先输入问题。'; return null; }
+  return {question, knowledge_base_ids:[...selectedChatKnowledgeBaseIds], top_k:5};
 }
 
 // 清空上次工具记录。无参数；无返回值，隐藏工具区域并重置内部索引。
-function clearToolActivity() {
-  toolRows.clear();
-  $('#tool-calls').replaceChildren();
-  $('#tool-activity').hidden = true;
+function clearToolActivity() { toolRows.clear(); $('#tool-calls').replaceChildren(); $('#tool-activity').hidden = true; }
+
+// 格式化服务端请求快照。bases：包含 id/name 的数组；返回库名说明字符串。
+function referenceNames(bases) { return bases.map(referenceName).join('、'); }
+
+// 生成回答时名称快照的简短摘要。bases：服务端返回的完整库引用；返回前 5 个名称及剩余数量。
+function referencePreview(bases) {
+  const shown = bases.slice(0, 5), remaining = bases.length - shown.length;
+  return `${referenceNames(shown)}${remaining ? `，另有 ${remaining} 个知识库` : ''}`;
 }
 
-// 展示真实工具开始事件。data：包含 call_id、工具名称、标题和可选检索问题；无返回值。
+// 取得快照中的名称。base：知识库引用对象；返回名称字符串。
+function referenceName(base) { return base.name; }
+
+// 展示工具开始事件。data：call_id/label/question/knowledge_bases；无返回值。
 function startTool(data) {
   $('#tool-activity').hidden = false;
-  const root = node('details', 'tool-call');
-  root.dataset.state = 'running';
-  const summary = node('summary');
-  const icon = node('span', 'tool-state', '');
-  icon.setAttribute('aria-hidden', 'true');
-  const label = node('span', 'tool-label', data.label || '检索知识库');
-  const meta = node('span', '', '检索中…');
-  const detail = node('div', 'tool-detail', data.question ? `检索问题：${data.question}` : '正在检索当前知识空间。');
-  summary.append(icon, label, meta);
-  root.append(summary, detail);
-  $('#tool-calls').append(root);
-  toolRows.set(data.call_id, {root, icon, meta, detail});
-  $('#query-status').textContent = 'Agent 正在检索知识库…';
+  const root = node('details', 'tool-call'); root.dataset.state = 'running';
+  const summary = node('summary'), icon = node('span', 'tool-state', ''); icon.setAttribute('aria-hidden', 'true');
+  const label = node('span', 'tool-label', data.label || '检索知识库'), meta = node('span', '', '检索中…');
+  const detail = node('div', 'tool-detail');
+  detail.append(node('div', '', `挂载：${referenceNames(data.knowledge_bases || [])}`));
+  if (data.question) detail.append(node('div', '', `检索问题：${data.question}`));
+  summary.append(icon, label, meta); root.append(summary, detail); $('#tool-calls').append(root);
+  toolRows.set(data.call_id, {root, icon, meta, detail}); $('#query-status').textContent = 'Agent 正在检索所选知识库…';
 }
 
-// 展示真实工具完成事件。data：call_id、chunk_count 和可选 elapsed_ms；无返回值。
+// 格式化各库命中数。hit：含 name/chunk_count 的结果；返回中文说明，包含零命中。
+function hitSummary(hit) { return `${hit.name} ${hit.chunk_count} 条`; }
+
+// 展示工具结束事件。data：call_id、chunk_count、elapsed_ms、分库命中；无返回值。
 function finishTool(data) {
-  const row = toolRows.get(data.call_id);
-  if (!row) return;
-  row.root.dataset.state = 'completed';
-  row.icon.textContent = '✓';
-  const count = Number(data.chunk_count || 0);
-  row.meta.textContent = count ? `找到 ${count} 条证据` : '未找到证据';
-  if (Number.isFinite(data.elapsed_ms)) {
-    row.detail.append(node('div', '', `用时 ${(data.elapsed_ms / 1000).toFixed(1)} 秒`));
-  }
+  const row = toolRows.get(data.call_id); if (!row) return;
+  row.root.dataset.state = 'completed'; row.icon.textContent = '✓';
+  const count = Number(data.chunk_count || 0); row.meta.textContent = count ? `找到 ${count} 条证据` : '未找到证据';
+  if (data.hits_by_knowledge_base) row.detail.append(node('div', '', `召回：${data.hits_by_knowledge_base.map(hitSummary).join('、')}`));
+  if (Number.isFinite(data.elapsed_ms)) row.detail.append(node('div', '', `用时 ${(data.elapsed_ms / 1000).toFixed(1)} 秒`));
   $('#query-status').textContent = '检索完成，正在生成回复…';
 }
 
-// 标记未完成的工具调用。stopped：是否由用户停止；无返回值，保留已有成功记录。
+// 标记未完成工具。stopped：用户是否主动停止；无返回值，保留已经完成的记录。
 function interruptTools(stopped) {
   for (const row of toolRows.values()) {
     if (row.root.dataset.state !== 'running') continue;
-    row.root.dataset.state = stopped ? 'stopped' : 'failed';
-    row.icon.textContent = stopped ? '–' : '×';
+    row.root.dataset.state = stopped ? 'stopped' : 'failed'; row.icon.textContent = stopped ? '–' : '×';
     row.meta.textContent = stopped ? '已停止' : '调用失败';
   }
 }
 
-// 消费 SSE 响应。response：fetch 响应；onEvent：接收事件名与 JSON 数据的函数。
-// 返回 Promise，流结束时完成值为 undefined；读取或解析失败时拒绝。
-// 使用 UTF-8 流式解码和逐行缓冲，兼容汉字、事件跨网络分片以及 CRLF 换行。
+// 消费 SSE。response：fetch 响应；onEvent：接收事件名与 JSON 数据的函数；返回 Promise<void>。
+// UTF-8 流式解码兼容汉字、跨网络分片及 CRLF；出错取消 reader，保留原异常。
 async function readEventStream(response, onEvent) {
   if (!response.body) throw new Error('浏览器未提供流式响应，请换用较新版本的浏览器。');
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '', eventName = 'message', dataLines = [];
-  let reachedEnd = false;
-
-  // 处理一行 SSE 数据。line：不含换行符的文本；空行触发 onEvent，注释行被忽略。
-  // 无返回值；事件名和数据行保存在外层闭包中，JSON 错误继续向外抛出。
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buffer = '', eventName = 'message', dataLines = [], reachedEnd = false;
+  // 处理一行 SSE。line：不含换行符的文本；无返回值；空行调用外层 onEvent，解析失败抛出。
   function consumeLine(line) {
     line = line.replace(/\r$/, '');
     if (!line) {
       if (dataLines.length) onEvent(eventName, JSON.parse(dataLines.join('\n')));
       eventName = 'message'; dataLines = [];
-    } else if (line.startsWith('event:')) {
-      eventName = line.slice(6).trim();
-    } else if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).replace(/^ /, ''));
-    }
+    } else if (line.startsWith('event:')) eventName = line.slice(6).trim();
+    else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
   }
-
   try {
     while (true) {
       const {value, done} = await reader.read();
-      buffer += done ? decoder.decode() : decoder.decode(value, {stream: true});
+      buffer += done ? decoder.decode() : decoder.decode(value, {stream:true});
       let newline;
-      while ((newline = buffer.indexOf('\n')) !== -1) {
-        consumeLine(buffer.slice(0, newline));
-        buffer = buffer.slice(newline + 1);
-      }
-      if (done) {
-        if (buffer) consumeLine(buffer);
-        consumeLine('');
-        reachedEnd = true;
-        break;
-      }
+      while ((newline = buffer.indexOf('\n')) !== -1) { consumeLine(buffer.slice(0, newline)); buffer = buffer.slice(newline + 1); }
+      if (done) { if (buffer) consumeLine(buffer); consumeLine(''); reachedEnd = true; break; }
     }
-  } finally {
-    if (!reachedEnd) await reader.cancel().catch(ignoreCancelError);
-    reader.releaseLock();
-  }
+  } finally { if (!reachedEnd) await reader.cancel().catch(ignoreCancelError); reader.releaseLock(); }
 }
 
-// 忽略取消读取时的二次异常。error：已关闭连接产生的错误；无返回值，保留原始错误。
-function ignoreCancelError(error) { /* 主请求的异常会由 askAgent 展示。 */ }
+// 忽略取消读取后的二次异常。error：reader 已关闭等错误；无返回值，保留主请求的错误。
+function ignoreCancelError(error) { /* 主请求异常在 askAgent 展示。 */ }
 
-// 仅检索而不生成。无参数；读取当前问题并展示召回证据，失败时更新查询状态。
-// 返回 Promise，完成值为 undefined；结束时恢复页面查询按钮。
+// 查询失败时更新失效范围。error：含 code 的业务异常；返回 Promise<void>，不自动替换库或重试。
+async function handleScopeFailure(error) {
+  if (!['KNOWLEDGE_BASE_NOT_FOUND','KNOWLEDGE_BASE_NOT_ACTIVE'].includes(error.code)) return;
+  try { await refreshKnowledgeBases(); } catch (refreshError) { /* 保留本次查询错误。 */ }
+}
+
+// 仅检索。无参数；返回 Promise<void>；捕获挂载范围，显示来源，结束时恢复查询按钮。
 async function retrieveOnly() {
-  const question = $('#question').value.trim();
-  if (!question) { $('#query-status').textContent = '请先输入问题。'; return; }
-  clearToolActivity(); setQueryBusy(true);
-  $('#answer').className = 'answer empty';
-  $('#query-status').textContent = '正在向量检索…'; $('#answer').textContent = '尚未运行 Agent。';
+  const payload = queryPayload(); if (!payload) return;
+  clearToolActivity(); renderChunks([]); setQueryBusy(true);
+  $('#answer').className = 'answer empty'; $('#answer').textContent = '尚未运行 Agent。';
+  $('#answer-scope').textContent = `本次检索范围：${scopePreview(payload.knowledge_base_ids)}`;
+  $('#query-status').textContent = '正在检索所选知识库…';
   try {
-    const chunks = await api('/api/retrieve', {method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question, tenant_id:tenantId(), top_k:5})});
-    renderChunks(chunks); $('#evidence').open = true;
-    $('#query-status').textContent = '检索完成；这一步没有调用 Chat 模型。';
-  } catch (error) { $('#query-status').textContent = `失败：${error.message}`; }
+    const chunks = await api('/api/retrieve', jsonRequest('POST', payload));
+    renderChunks(chunks); $('#evidence').open = true; $('#query-status').textContent = '检索完成；这一步没有调用 Chat 模型。';
+  } catch (error) { await handleScopeFailure(error); $('#query-status').textContent = `失败：${error.message}`; }
   finally { setQueryBusy(false); }
 }
 
-// 发起 Agent 流式问答。无参数；将文字增量、工具进度和证据更新到当前回复区域。
-// 返回 Promise，完成值为 undefined；成功、失败或主动停止后都会恢复页面交互。
+// 发起流式问答。无参数；返回 Promise<void>；锁定挂载范围，保留已有文字，结束后释放查询锁。
 async function askAgent() {
-  const question = $('#question').value.trim();
-  if (!question) { $('#query-status').textContent = '请先输入问题。'; return; }
-  const controller = new AbortController();
-  activeController = controller;
+  const payload = queryPayload(); if (!payload) return;
+  const controller = new AbortController(); activeController = controller;
   let answer = '', completed = false;
-  clearToolActivity(); renderChunks([]); setQueryBusy(true, true);
-  $('#evidence').open = false;
-  $('#answer').textContent = '';
-  $('#answer').className = 'answer streaming';
+  clearToolActivity(); renderChunks([]); setQueryBusy(true, true); $('#evidence').open = false;
+  $('#answer').textContent = ''; $('#answer').className = 'answer streaming';
+  $('#answer-scope').textContent = `本次挂载：${scopePreview(payload.knowledge_base_ids)}`;
   $('#query-status').textContent = 'Agent 正在准备检索…';
-
-  // 分发本次问答事件。name：事件名称；data：事件 JSON；更新闭包中的回答和完成状态。
-  // 无返回值；收到 error 事件时抛出异常，由外层 askAgent 展示错误。
+  // 分发本次事件。name：SSE 事件名；data：JSON；无返回值；更新回答闭包，error 抛异常。
   function handleEvent(name, data) {
     if (name === 'status') $('#query-status').textContent = data.message;
     else if (name === 'tool_start') startTool(data);
     else if (name === 'tool_end') finishTool(data);
     else if (name === 'citations') renderChunks(data.citations || []);
-    else if (name === 'text_delta') {
-      answer += data.delta || '';
-      $('#answer').textContent = answer;
-      $('#query-status').textContent = '正在生成回复…';
-    } else if (name === 'done') {
-      completed = true;
-      answer = data.answer;
-      $('#answer').textContent = answer;
-      renderChunks(data.citations || []);
+    else if (name === 'text_delta') { answer += data.delta || ''; $('#answer').textContent = answer; $('#query-status').textContent = '正在生成回复…'; }
+    else if (name === 'done') {
+      completed = true; answer = data.answer; $('#answer').textContent = answer; renderChunks(data.citations || []);
+      if (data.knowledge_bases) $('#answer-scope').textContent = `本次挂载：${referencePreview(data.knowledge_bases)}`;
       $('#query-status').textContent = '回答完成';
-    } else if (name === 'error') throw new Error(data.message || '生成失败，请重试。');
+    } else if (name === 'error') throw responseError(data, '生成失败，请重试。');
   }
-
   try {
-    const response = await fetch('/api/chat/stream', {method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question, tenant_id:tenantId(), top_k:5}), signal:controller.signal});
-    if (!response.ok) {
-      const data = await response.json().catch(emptyResponse);
-      throw new Error(data.detail || `HTTP ${response.status}`);
-    }
+    const response = await fetch('/api/chat/stream', {...jsonRequest('POST', payload), signal:controller.signal});
+    if (!response.ok) { const data = await response.json().catch(emptyResponse); throw responseError(data.detail, `HTTP ${response.status}`); }
     await readEventStream(response, handleEvent);
     if (!completed) throw new Error('连接提前结束，回答尚未完成，请重试。');
   } catch (error) {
-    const stopped = error.name === 'AbortError';
-    controller.abort(); interruptTools(stopped);
+    const stopped = error.name === 'AbortError'; controller.abort(); interruptTools(stopped);
+    if (!stopped) await handleScopeFailure(error);
     $('#query-status').textContent = stopped ? '已停止生成，保留已收到的内容。' : `失败：${error.message}`;
     if (!answer) $('#answer').textContent = stopped ? '已停止。' : '未生成回复，请重试。';
-  } finally {
-    $('#answer').classList.remove('streaming');
-    if (activeController === controller) activeController = null;
-    setQueryBusy(false);
-  }
+  } finally { $('#answer').classList.remove('streaming'); if (activeController === controller) activeController = null; setQueryBusy(false); }
 }
 
-// 提供无法解析错误响应时的默认值。无参数；返回空对象，避免掩盖 HTTP 状态。
-function emptyResponse() { return {}; }
+// 停止当前回答。无参数；无返回值；中断 fetch，后端取消 Agent，保留已显示回复。
+function stopAnswer() { if (activeController) { $('#stop').disabled = true; activeController.abort(); } }
 
-// 停止当前流式回答。无参数；中断 fetch，让服务端取消本次 Agent 运行。
-// 无返回值；取消后由 askAgent 保留已收到的回复并恢复按钮。
-function stopAnswer() {
-  if (activeController) {
-    $('#stop').disabled = true;
-    activeController.abort();
-  }
+// 手动刷新库与文档。无参数；返回 Promise<void>；管理写操作中不执行。
+async function refreshLibraries() {
+  if (managementBusy) return;
+  try { await refreshKnowledgeBases(); await loadDocuments(); } catch (error) { showManagementError(error); }
 }
 
-// 手动刷新文档。无参数；加载列表，异常交给上传状态区域展示。
-// 无返回值；启动异步加载，但不等待它完成。
-function refreshDocuments() { loadDocuments().catch(showIngestError); }
+// 手动刷新当前文档及打开的分块详情。无参数；返回 Promise<void>，详情请求失败在自己的面板中展示。
+async function refreshDocuments() {
+  if (managementBusy) return;
+  try { await loadDocuments(); if (inspectedDocument) await reloadDocumentInspection(); } catch (error) { showIngestError(error); }
+}
 
+// 管理库列表前一页。无参数；返回 Promise<void>；分页不改变管理目标和聊天挂载。
+async function previousKnowledgeBasePage() { if (!managementBusy && kbOffset > 0) { kbOffset -= PAGE_SIZE; await refreshLibraries(); } }
+
+// 管理库列表后一页。无参数；返回 Promise<void>；完整聊天选择器仍可选择其他页的库。
+async function nextKnowledgeBasePage() { if (!managementBusy && kbOffset + PAGE_SIZE < kbTotal) { kbOffset += PAGE_SIZE; await refreshLibraries(); } }
+
+// 文档列表前一页。无参数；返回 Promise<void>；异常更新上传状态。
+async function previousDocumentPage() {
+  if (!managementBusy && documentOffset > 0) { documentOffset -= PAGE_SIZE; try { await loadDocuments(); } catch (error) { showIngestError(error); } }
+}
+
+// 文档列表后一页。无参数；返回 Promise<void>；异常更新上传状态。
+async function nextDocumentPage() {
+  if (!managementBusy && documentOffset + PAGE_SIZE < documentTotal) { documentOffset += PAGE_SIZE; try { await loadDocuments(); } catch (error) { showIngestError(error); } }
+}
+
+// 初始化页面。无参数；返回 Promise<void>；先加载库和默认范围，再加载文档。
+async function initializePage() { syncControls(); await refreshKnowledgeBases(); await loadDocuments(); }
+
+// 显示初始化失败。error：加载异常；无返回值，提示刷新知识库重试。
+function showInitializationError(error) { showManagementError(error); $('#selected-scope').textContent = '知识库未加载，请点击此处“刷新”重试。'; }
+
+$('#chat-tab').onclick = openChatPage;
+$('#management-tab').onclick = openManagementPage;
+$('#chat-tab').onkeydown = navigateTabs;
+$('#management-tab').onkeydown = navigateTabs;
+$('#scope-search').oninput = searchChatScope;
+$('#select-all-scope').onclick = selectAllChatScope;
+$('#clear-scope').onclick = clearChatScope;
+$('#refresh-scope').onclick = refreshLibraries;
+$('#create-kb').onclick = createKnowledgeBase;
+$('#save-kb').onclick = updateKnowledgeBase;
+$('#delete-kb').onclick = deleteKnowledgeBase;
+$('#refresh-libraries').onclick = refreshLibraries;
+$('#kb-prev').onclick = previousKnowledgeBasePage;
+$('#kb-next').onclick = nextKnowledgeBasePage;
+$('#doc-prev').onclick = previousDocumentPage;
+$('#doc-next').onclick = nextDocumentPage;
 $('#upload').onclick = uploadDocument;
 $('#refresh').onclick = refreshDocuments;
+$('#inspect-close').onclick = closeDocumentInspection;
+$('#inspect-reload').onclick = reloadDocumentInspection;
+$('#inspect-retry').onclick = reloadDocumentInspection;
+$('#inspect-prev').onclick = previousInspectionPage;
+$('#inspect-next').onclick = nextInspectionPage;
 $('#retrieve').onclick = retrieveOnly;
 $('#chat').onclick = askAgent;
 $('#stop').onclick = stopAnswer;
-loadDocuments().catch(showIngestError);
+initializePage().catch(showInitializationError);
 </script>
 </body>
 </html>

@@ -21,10 +21,12 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1536
     # Qdrant 服务地址，以及本项目存储文档片段的集合名称。
     qdrant_url: str = "http://qdrant:6333"
-    qdrant_collection: str = "henan_rag_chunks"
+    qdrant_collection: str = "henan_rag_knowledge_chunks"
+    # 知识库和文档元数据使用本地 SQLite；与上传文件一起挂载到 data 目录持久化。
+    metadata_db_path: str = "/app/data/metadata.sqlite3"
     # 上传限制按 1024 * 1024 字节计算；upload_dir 保存上传文档的原文件。
     max_upload_mb: int = 20
-    upload_dir: str = "/app/data/uploads"
+    upload_dir: str = "/app/data/knowledge-uploads"
 
 
 # 用途：读取并缓存项目配置，让同一进程中的调用复用同一个 Settings 实例。
