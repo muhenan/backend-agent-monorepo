@@ -14,7 +14,11 @@ from agent_mem.app import app, parse_write_result
 class MemoryTests(unittest.TestCase):
     def test_homepage_and_static_assets(self):
         client = TestClient(app)
-        for path, expected in [("/", "<!doctype html>"), ("/static/app.js", "search_memory"), ("/static/styles.css", ".turn-memory-details")]:
+        for path, expected in [
+            ("/", "<!doctype html>"),
+            ("/static/app.js", "search_memory"),
+            ("/static/styles.css", ".turn-activity"),
+        ]:
             response = client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertIn(expected, response.text)

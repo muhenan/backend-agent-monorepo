@@ -97,7 +97,7 @@ agent-mem/
 ## 一轮对话的数据流
 
 ```text
-浏览器 POST /api/chat（当前消息 + 最近 20 条会话消息）
+浏览器 POST /api/chat/stream（当前消息 + 最近 20 条会话消息）
        │
        └─ Agents SDK Agent
               ├─ 上下文足够：直接回答
@@ -110,9 +110,11 @@ agent-mem/
 
 浏览器保留当前会话最近 20 条消息，新对话、刷新页面或切换身份会清除会话上下文，长期记忆仍保留。会话历史只接受 user/assistant 角色。
 
-每条回答下方展示搜索调用次数和写入结果，并可展开查看搜索词、召回内容、实际 ADD/UPDATE/DELETE 事件及记录 ID。未调用、查询无结果、查询失败分别展示；写入为空显示“已尝试，无变更”，写入失败保留回答。非预期写入响应显示“无法确认”，不会将返回文本冒充成功保存。
+回复通过 SSE 逐段显示。每条回答下方用紧凑的活动标题实时展示工具搜索的开始、完成或失败；点击标题可以查看搜索词和结果。回答生成完毕后立即显示完整正文，记忆提取与保存仍会继续，其进度和实际 ADD/UPDATE/DELETE 事件单独展示。未调用、查询无结果、查询失败分别展示；写入为空显示“已尝试，无变更”，写入失败保留回答。非预期写入响应显示“无法确认”，不会将返回文本冒充成功保存。
 
-API 保留 recalled_memories/saved_memories，并增加 memory_searches 和 memory_write。保存状态来自 Mem0 已完成操作返回的事件，不根据模型的“我记住了”判断。
+`POST /api/chat/stream` 返回 `text/event-stream`，每帧的 JSON 包含 `type`：`status`、`text_delta`、`tool_start`、`tool_end`、`answer_done`、`memory_write_start`、`memory_write_done`、`done` 或 `error`。等待模型、工具或保存时每 10 秒发送注释心跳。中途失败保留已显示的正文，不自动重发请求；未完整生成的回答不会交给 Mem0 保存。客户端断开后会取消模型流，但已经开始的同步 Mem0 操作可能仍会完成，界面不会冒称其保存结果已确认。
+
+原有非流式 `POST /api/chat` 保留兼容。最终 `done` 帧使用同样的响应字段，包括 recalled_memories、saved_memories、memory_searches 和 memory_write。保存状态来自 Mem0 已完成操作返回的事件，不根据模型的“我记住了”判断。
 
 Mem0 提取使用 DeepSeek，embedding 使用 OpenAI text-embedding-3-small（1536 维）。镜像使用 uv.lock 构建，并包含 tests。
 
@@ -123,6 +125,9 @@ docker compose exec app uv run --no-sync python -m unittest discover -s tests -v
 docker compose exec app uv run --group dev ruff check src tests
 # 真实 API 测试，消耗模型调用，使用独立测试身份并在成功后清理其记忆：
 python tests/live_smoke.py
+python tests/live_stream_smoke.py
+# 在仓库根目录运行前端流与状态测试：
+node --test agent-mem/tests/test_frontend.cjs
 ```
 
 真实 API 测试要求 localhost:8000 的服务运行。可以手动先介绍姓名与偏好，再点“新对话”询问历史，观察搜索调用和真实保存事件。普通知识问题通常无需搜索；工具选择由模型决定，存在行为波动。

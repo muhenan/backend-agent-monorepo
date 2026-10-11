@@ -43,15 +43,11 @@
             </div>
           </div>
           <div class="messages" id="messages" aria-live="polite"></div>
-          <div class="memory-inspector hidden" id="memory-inspector">
-            <div class="inspector-heading"><div><span class="inspector-icon">✳</span><b>本轮记忆活动</b></div><button id="close-inspector" aria-label="关闭">×</button></div>
-            <div class="inspector-columns"><div><small>search_memory 调用</small><div id="recalled-list"></div></div><div><small>实际保存结果</small><div id="saved-list"></div></div></div>
-          </div>
         </section>
         <footer class="composer-wrap">
           <form class="composer" id="chat-form">
             <textarea id="message-input" rows="1" placeholder="发消息给 Memory Chatbot…" aria-label="消息内容"></textarea>
-            <div class="composer-bottom"><div class="composer-hint"><span>↵</span> 发送 <span class="hint-separator">·</span> 消息会用于更新你的记忆</div><button class="send-button" id="send-button" aria-label="发送消息">↑</button></div>
+            <div class="composer-bottom"><div class="composer-hint"><span>↵</span> 发送 <span class="hint-separator">·</span> 回复下方可查看工具与记忆活动</div><button class="send-button" id="send-button" aria-label="发送消息">↑</button></div>
           </form>
           <div class="disclaimer">AI 生成的内容可能不准确。对话记忆保存在本地 Qdrant 中。</div>
         </footer>
