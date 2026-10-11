@@ -24,7 +24,7 @@
 
 ## Henan RAG
 
-一个可观察完整 RAG 流程的学习实验室：解析上传文档、按段落切块、生成 embedding 并写入 Qdrant；提问时按 tenant 检索相关片段，再让 Agent 基于检索证据回答并给出引用。
+一个可观察完整 RAG 流程的学习实验室：解析上传文档、按段落切块、生成 embedding 并写入 Qdrant；Agent 调用知识库工具检索当前空间的相关片段，流式回答并给出引用，网页同步展示工具调用状态。
 
 - 目录：[henan-rag/](./henan-rag/)
 - 详细说明：[henan-rag/README.md](./henan-rag/README.md)

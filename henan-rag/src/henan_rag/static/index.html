@@ -18,6 +18,8 @@
     button { cursor: pointer; border: 0; border-radius: 7px; padding: 9px 13px; background: #1559a6; color: white; font: inherit; }
     button.secondary { color: #23415f; background: #eaf0f7; }
     button.danger { background: #fff0ee; color: #a63327; padding: 5px 9px; }
+    button:disabled { cursor: wait; opacity: .55; }
+    [hidden] { display: none !important; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .row button { margin-top: 10px; }
     .muted { color: #66758a; font-size: 13px; }
@@ -27,7 +29,27 @@
     .chunk { padding-left: 10px; border-left: 3px solid #8eb5e4; margin: 10px 0; background: #fafbfd; }
     .chunk-head { display: flex; justify-content: space-between; gap: 8px; color: #496582; font-size: 13px; }
     .chunk-text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 5px; }
-    .answer { white-space: pre-wrap; padding: 12px; background: #f4f7fb; border-radius: 8px; }
+    .answer { white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px 0; min-height: 72px; }
+    .answer.streaming::after { content: ''; display: inline-block; width: 6px; height: 15px; background: #73869a; margin-left: 3px; vertical-align: middle; animation: blink 1s step-end infinite; }
+    .answer.empty { color: #66758a; }
+    .answer-heading { margin: 20px 0 0; font-size: 16px; }
+    .tool-activity { padding: 8px 0 12px; border-bottom: 1px solid #e7edf4; }
+    .tool-heading { margin: 0 0 6px; font-size: 12px; font-weight: 500; color: #778697; }
+    .tool-call { font-size: 12px; color: #66758a; margin: 5px 0; }
+    .tool-call summary { display: flex; align-items: center; gap: 7px; cursor: pointer; list-style: none; }
+    .tool-call summary::-webkit-details-marker { display: none; }
+    .tool-call summary::after { content: '›'; color: #8c99a7; }
+    .tool-call[open] summary::after { transform: rotate(90deg); }
+    .tool-label { font-weight: 550; color: #516174; }
+    .tool-state { width: 13px; text-align: center; color: #5b7d66; }
+    .tool-call[data-state="running"] .tool-state { width: 11px; height: 11px; margin: 0 1px; border: 1.5px solid #d7dfe8; border-top-color: #71849a; border-radius: 50%; animation: spin .8s linear infinite; }
+    .tool-call[data-state="failed"] .tool-state { color: #a63327; }
+    .tool-detail { margin: 6px 0 8px 20px; color: #7b8796; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .evidence { margin-top: 18px; }
+    .evidence > summary { cursor: pointer; color: #52657c; font-size: 13px; }
+    @keyframes blink { 50% { opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .answer.streaming::after, .tool-call[data-state="running"] .tool-state { animation: none; } }
     .badge { font-size: 12px; color: #68788d; }
     @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
   </style>
@@ -51,64 +73,91 @@
       <section class="panel">
         <h2>数据流</h2>
         <div class="status">文件 → Docling Markdown → paragraph-aware chunks → OpenAI embeddings → Qdrant</div>
-        <div class="status">问题 → embedding → Qdrant top-k → 可见证据 → OpenAI Agent → 带引用答案</div>
+        <div class="status">问题 → Agent 调用知识库检索工具 → Qdrant top-k → 流式回答 + 引用证据</div>
       </section>
     </div>
     <section class="panel">
-      <h2>② 先检索，再让 Agent 回答</h2>
-      <p class="muted">“只看召回”不调用生成模型；“检索 + 回答”会在同一组召回片段上运行 Agent。对比两者，能分辨是检索问题还是生成问题。</p>
+      <h2>② 检索与 Agent 问答</h2>
+      <p class="muted">先用“只看召回”检查证据，再让 Agent 调用知识库工具回答。文字会逐步显示，回复下方可查看工具调用进度。</p>
       <label for="question">问题</label>
       <textarea id="question" placeholder="例如：资料里的服务开放时间是什么？"></textarea>
-      <div class="row"><button class="secondary" id="retrieve">只看召回</button><button id="chat">检索 + Agent 回答</button></div>
-      <div class="status" id="query-status">尚未查询</div>
-      <h3>召回证据 <span class="badge" id="hit-count"></span></h3>
-      <div id="chunks"></div>
-      <h3>Agent 答案</h3>
-      <div class="answer" id="answer">回答会显示在这里。</div>
+      <div class="row"><button class="secondary" id="retrieve">只看召回</button><button id="chat">检索 + Agent 回答</button><button class="secondary" id="stop" hidden>停止生成</button></div>
+      <div class="status" id="query-status" role="status">尚未查询</div>
+      <h3 class="answer-heading">Agent 回复</h3>
+      <div class="answer empty" id="answer">回答会显示在这里。</div>
+      <div class="tool-activity" id="tool-activity" hidden>
+        <h4 class="tool-heading">工具调用</h4>
+        <div id="tool-calls"></div>
+      </div>
+      <details class="evidence" id="evidence">
+        <summary>召回证据 <span class="badge" id="hit-count"></span></summary>
+        <div id="chunks"></div>
+      </details>
     </section>
   </div>
 <script>
-const $ = (selector) => document.querySelector(selector);
-const tenantId = () => $('#tenant').value.trim() || 'default';
+// 根据 CSS 选择器查找页面元素。selector：选择器字符串；返回首个匹配元素。
+function $(selector) { return document.querySelector(selector); }
+
+// 读取当前知识空间。无参数；返回用户输入的标识，空白时使用 default。
+function tenantId() { return $('#tenant').value.trim() || 'default'; }
+
+// 创建安全的 DOM 节点。tag：标签名；className：CSS 类；text：可选纯文本；返回元素。
 function node(tag, className, text) {
   const item = document.createElement(tag);
   if (className) item.className = className;
   if (text !== undefined) item.textContent = text;
   return item;
 }
+
+// 发送普通 JSON API 请求。url：接口地址；options：fetch 配置；返回 Promise，完成值为解析后的 JSON，失败时拒绝。
 async function api(url, options = {}) {
   const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(emptyResponse);
   if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
   return data;
 }
+
+// 显示文档操作错误。error：请求异常；无返回值，更新上传区域的状态文字。
+function showIngestError(error) { $('#ingest-status').textContent = error.message; }
+
+// 加载当前知识空间的文档列表。无参数；生成文档信息和删除按钮。
+// 返回 Promise，完成值为 undefined；请求失败时拒绝，由调用方处理。
 async function loadDocuments() {
   const docs = await api(`/api/documents?tenant_id=${encodeURIComponent(tenantId())}`);
   const root = $('#documents'); root.replaceChildren();
   if (!docs.length) { root.append(node('p', 'muted', '还没有文档')); return; }
-  docs.forEach((doc) => {
+  for (const doc of docs) {
     const row = node('div', 'doc'); const title = node('div', 'doc-title');
     title.append(node('strong', '', doc.source));
     const del = node('button', 'danger', '删除');
-    del.onclick = async () => {
+    // 删除当前列表项。无参数；闭包中的 doc 是这行文档，完成后刷新列表。
+    // 返回 Promise，完成值为 undefined；错误在函数内部展示到上传状态区域。
+    async function deleteDocument() {
       try {
         await api(`/api/documents/${encodeURIComponent(doc.document_id)}?tenant_id=${encodeURIComponent(tenantId())}`, {method:'DELETE'});
         await loadDocuments();
       } catch (error) { $('#ingest-status').textContent = error.message; }
-    };
+    }
+    del.onclick = deleteDocument;
     title.append(del); row.append(title, node('div', 'muted', `${doc.chunk_count} 个 chunks`)); root.append(row);
-  });
+  }
 }
+
+// 展示检索证据。chunks：后端返回的片段数组；无返回值，更新来源、分数和原文。
 function renderChunks(chunks) {
   const root = $('#chunks'); root.replaceChildren(); $('#hit-count').textContent = chunks.length ? `（${chunks.length} 条）` : '（0 条）';
-  chunks.forEach((chunk, index) => {
+  for (const [index, chunk] of chunks.entries()) {
     const card = node('div', 'chunk'); const head = node('div', 'chunk-head');
     head.append(node('span', '', `[${index + 1}] ${chunk.source} · chunk ${chunk.chunk_index}`));
     head.append(node('span', '', `score ${Number(chunk.score).toFixed(4)}`));
     card.append(head, node('div', 'chunk-text', chunk.text)); root.append(card);
-  });
+  }
 }
-$('#upload').onclick = async () => {
+
+// 上传选中的文件。无参数；读取文件和知识空间，成功后展示入库结果并刷新列表。
+// 返回 Promise，完成值为 undefined；上传错误在函数内部展示。
+async function uploadDocument() {
   const file = $('#file').files[0]; if (!file) { $('#ingest-status').textContent = '请先选择文件'; return; }
   const data = new FormData(); data.append('file', file); data.append('tenant_id', tenantId());
   $('#ingest-status').textContent = 'Docling 解析和 embedding 中…';
@@ -117,25 +166,214 @@ $('#upload').onclick = async () => {
     $('#ingest-status').textContent = `已入库：${result.source} · ${result.chunk_count} 个 chunks · document_id ${result.document_id}`;
     await loadDocuments();
   } catch (error) { $('#ingest-status').textContent = `失败：${error.message}`; }
-};
-$('#refresh').onclick = () => loadDocuments().catch((error) => { $('#ingest-status').textContent = error.message; });
-$('#retrieve').onclick = async () => {
+}
+
+const toolRows = new Map();
+let activeController = null;
+
+// 控制查询期间的交互。busy：是否执行中；streaming：是否可停止的流式回答；无返回值。
+function setQueryBusy(busy, streaming = false) {
+  $('#chat').disabled = busy;
+  $('#retrieve').disabled = busy;
+  $('#tenant').disabled = busy;
+  $('#stop').hidden = !busy || !streaming;
+  $('#stop').disabled = false;
+  $('#chat').textContent = busy && streaming ? '回答中…' : '检索 + Agent 回答';
+  $('#answer').setAttribute('aria-busy', String(busy && streaming));
+}
+
+// 清空上次工具记录。无参数；无返回值，隐藏工具区域并重置内部索引。
+function clearToolActivity() {
+  toolRows.clear();
+  $('#tool-calls').replaceChildren();
+  $('#tool-activity').hidden = true;
+}
+
+// 展示真实工具开始事件。data：包含 call_id、工具名称、标题和可选检索问题；无返回值。
+function startTool(data) {
+  $('#tool-activity').hidden = false;
+  const root = node('details', 'tool-call');
+  root.dataset.state = 'running';
+  const summary = node('summary');
+  const icon = node('span', 'tool-state', '');
+  icon.setAttribute('aria-hidden', 'true');
+  const label = node('span', 'tool-label', data.label || '检索知识库');
+  const meta = node('span', '', '检索中…');
+  const detail = node('div', 'tool-detail', data.question ? `检索问题：${data.question}` : '正在检索当前知识空间。');
+  summary.append(icon, label, meta);
+  root.append(summary, detail);
+  $('#tool-calls').append(root);
+  toolRows.set(data.call_id, {root, icon, meta, detail});
+  $('#query-status').textContent = 'Agent 正在检索知识库…';
+}
+
+// 展示真实工具完成事件。data：call_id、chunk_count 和可选 elapsed_ms；无返回值。
+function finishTool(data) {
+  const row = toolRows.get(data.call_id);
+  if (!row) return;
+  row.root.dataset.state = 'completed';
+  row.icon.textContent = '✓';
+  const count = Number(data.chunk_count || 0);
+  row.meta.textContent = count ? `找到 ${count} 条证据` : '未找到证据';
+  if (Number.isFinite(data.elapsed_ms)) {
+    row.detail.append(node('div', '', `用时 ${(data.elapsed_ms / 1000).toFixed(1)} 秒`));
+  }
+  $('#query-status').textContent = '检索完成，正在生成回复…';
+}
+
+// 标记未完成的工具调用。stopped：是否由用户停止；无返回值，保留已有成功记录。
+function interruptTools(stopped) {
+  for (const row of toolRows.values()) {
+    if (row.root.dataset.state !== 'running') continue;
+    row.root.dataset.state = stopped ? 'stopped' : 'failed';
+    row.icon.textContent = stopped ? '–' : '×';
+    row.meta.textContent = stopped ? '已停止' : '调用失败';
+  }
+}
+
+// 消费 SSE 响应。response：fetch 响应；onEvent：接收事件名与 JSON 数据的函数。
+// 返回 Promise，流结束时完成值为 undefined；读取或解析失败时拒绝。
+// 使用 UTF-8 流式解码和逐行缓冲，兼容汉字、事件跨网络分片以及 CRLF 换行。
+async function readEventStream(response, onEvent) {
+  if (!response.body) throw new Error('浏览器未提供流式响应，请换用较新版本的浏览器。');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', eventName = 'message', dataLines = [];
+  let reachedEnd = false;
+
+  // 处理一行 SSE 数据。line：不含换行符的文本；空行触发 onEvent，注释行被忽略。
+  // 无返回值；事件名和数据行保存在外层闭包中，JSON 错误继续向外抛出。
+  function consumeLine(line) {
+    line = line.replace(/\r$/, '');
+    if (!line) {
+      if (dataLines.length) onEvent(eventName, JSON.parse(dataLines.join('\n')));
+      eventName = 'message'; dataLines = [];
+    } else if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).replace(/^ /, ''));
+    }
+  }
+
+  try {
+    while (true) {
+      const {value, done} = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, {stream: true});
+      let newline;
+      while ((newline = buffer.indexOf('\n')) !== -1) {
+        consumeLine(buffer.slice(0, newline));
+        buffer = buffer.slice(newline + 1);
+      }
+      if (done) {
+        if (buffer) consumeLine(buffer);
+        consumeLine('');
+        reachedEnd = true;
+        break;
+      }
+    }
+  } finally {
+    if (!reachedEnd) await reader.cancel().catch(ignoreCancelError);
+    reader.releaseLock();
+  }
+}
+
+// 忽略取消读取时的二次异常。error：已关闭连接产生的错误；无返回值，保留原始错误。
+function ignoreCancelError(error) { /* 主请求的异常会由 askAgent 展示。 */ }
+
+// 仅检索而不生成。无参数；读取当前问题并展示召回证据，失败时更新查询状态。
+// 返回 Promise，完成值为 undefined；结束时恢复页面查询按钮。
+async function retrieveOnly() {
+  const question = $('#question').value.trim();
+  if (!question) { $('#query-status').textContent = '请先输入问题。'; return; }
+  clearToolActivity(); setQueryBusy(true);
+  $('#answer').className = 'answer empty';
   $('#query-status').textContent = '正在向量检索…'; $('#answer').textContent = '尚未运行 Agent。';
   try {
     const chunks = await api('/api/retrieve', {method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question:$('#question').value, tenant_id:tenantId(), top_k:5})});
-    renderChunks(chunks); $('#query-status').textContent = '检索完成；这一步没有调用 Chat 模型。';
+      body:JSON.stringify({question, tenant_id:tenantId(), top_k:5})});
+    renderChunks(chunks); $('#evidence').open = true;
+    $('#query-status').textContent = '检索完成；这一步没有调用 Chat 模型。';
   } catch (error) { $('#query-status').textContent = `失败：${error.message}`; }
-};
-$('#chat').onclick = async () => {
-  $('#query-status').textContent = '正在检索并运行 Agents SDK…';
+  finally { setQueryBusy(false); }
+}
+
+// 发起 Agent 流式问答。无参数；将文字增量、工具进度和证据更新到当前回复区域。
+// 返回 Promise，完成值为 undefined；成功、失败或主动停止后都会恢复页面交互。
+async function askAgent() {
+  const question = $('#question').value.trim();
+  if (!question) { $('#query-status').textContent = '请先输入问题。'; return; }
+  const controller = new AbortController();
+  activeController = controller;
+  let answer = '', completed = false;
+  clearToolActivity(); renderChunks([]); setQueryBusy(true, true);
+  $('#evidence').open = false;
+  $('#answer').textContent = '';
+  $('#answer').className = 'answer streaming';
+  $('#query-status').textContent = 'Agent 正在准备检索…';
+
+  // 分发本次问答事件。name：事件名称；data：事件 JSON；更新闭包中的回答和完成状态。
+  // 无返回值；收到 error 事件时抛出异常，由外层 askAgent 展示错误。
+  function handleEvent(name, data) {
+    if (name === 'status') $('#query-status').textContent = data.message;
+    else if (name === 'tool_start') startTool(data);
+    else if (name === 'tool_end') finishTool(data);
+    else if (name === 'citations') renderChunks(data.citations || []);
+    else if (name === 'text_delta') {
+      answer += data.delta || '';
+      $('#answer').textContent = answer;
+      $('#query-status').textContent = '正在生成回复…';
+    } else if (name === 'done') {
+      completed = true;
+      answer = data.answer;
+      $('#answer').textContent = answer;
+      renderChunks(data.citations || []);
+      $('#query-status').textContent = '回答完成';
+    } else if (name === 'error') throw new Error(data.message || '生成失败，请重试。');
+  }
+
   try {
-    const result = await api('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question:$('#question').value, tenant_id:tenantId(), top_k:5})});
-    renderChunks(result.citations); $('#answer').textContent = result.answer; $('#query-status').textContent = '完成';
-  } catch (error) { $('#query-status').textContent = `失败：${error.message}`; }
-};
-loadDocuments().catch((error) => { $('#ingest-status').textContent = error.message; });
+    const response = await fetch('/api/chat/stream', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question, tenant_id:tenantId(), top_k:5}), signal:controller.signal});
+    if (!response.ok) {
+      const data = await response.json().catch(emptyResponse);
+      throw new Error(data.detail || `HTTP ${response.status}`);
+    }
+    await readEventStream(response, handleEvent);
+    if (!completed) throw new Error('连接提前结束，回答尚未完成，请重试。');
+  } catch (error) {
+    const stopped = error.name === 'AbortError';
+    controller.abort(); interruptTools(stopped);
+    $('#query-status').textContent = stopped ? '已停止生成，保留已收到的内容。' : `失败：${error.message}`;
+    if (!answer) $('#answer').textContent = stopped ? '已停止。' : '未生成回复，请重试。';
+  } finally {
+    $('#answer').classList.remove('streaming');
+    if (activeController === controller) activeController = null;
+    setQueryBusy(false);
+  }
+}
+
+// 提供无法解析错误响应时的默认值。无参数；返回空对象，避免掩盖 HTTP 状态。
+function emptyResponse() { return {}; }
+
+// 停止当前流式回答。无参数；中断 fetch，让服务端取消本次 Agent 运行。
+// 无返回值；取消后由 askAgent 保留已收到的回复并恢复按钮。
+function stopAnswer() {
+  if (activeController) {
+    $('#stop').disabled = true;
+    activeController.abort();
+  }
+}
+
+// 手动刷新文档。无参数；加载列表，异常交给上传状态区域展示。
+// 无返回值；启动异步加载，但不等待它完成。
+function refreshDocuments() { loadDocuments().catch(showIngestError); }
+
+$('#upload').onclick = uploadDocument;
+$('#refresh').onclick = refreshDocuments;
+$('#retrieve').onclick = retrieveOnly;
+$('#chat').onclick = askAgent;
+$('#stop').onclick = stopAnswer;
+loadDocuments().catch(showIngestError);
 </script>
 </body>
 </html>

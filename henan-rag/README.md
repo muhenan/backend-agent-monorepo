@@ -11,7 +11,7 @@
 - 自写 Markdown 段落切块：小段尽量合并，长段按字符窗口切分并保留 overlap
 - OpenAI Embeddings API：把 chunk 和问题映射到同一向量空间
 - Qdrant：存储 chunk、来源、文档 ID、tenant id 和向量，按 tenant 过滤后做 top-k dense retrieval
-- OpenAI Agents SDK：通过 DeepSeek 的 OpenAI 兼容接口接收显式检索证据，生成带 `[证据 N]` 标记的回答
+- OpenAI Agents SDK：通过 DeepSeek 的 OpenAI 兼容接口调用 `search_knowledge` 知识库检索工具，流式生成带 `[证据 N]` 标记的回答
 - Docker Compose：运行 Web API 与 Qdrant，数据保存在 Qdrant volume 和 `data/uploads/`
 
 Embeddings 使用 `OPENAI_API_KEY` 和 `OPENAI_BASE_URL`，Agent 对话使用 `CHAT_API_KEY`、`CHAT_BASE_URL`、`CHAT_MODEL`。默认值与 `agent-mem` 保持一致：OpenAI 提供 Embeddings，DeepSeek 提供对话模型。Agents SDK tracing 默认关闭，避免学习用的输入和输出被发送到追踪服务。
@@ -31,7 +31,7 @@ make setup
 make up
 ```
 
-打开 <http://localhost:8002>，上传 [`examples/rag-demo.md`](examples/rag-demo.md)。页面会分别显示召回的 chunk、相似度分数和 Agent 的最终回答。
+打开 <http://localhost:8002>，上传 [`examples/rag-demo.md`](examples/rag-demo.md)。页面会逐步显示 Agent 的回复，并在回复下方展示工具调用进度；展开“召回证据”可查看原文和相似度分数。
 
 ## 一次查询的数据流
 
@@ -40,14 +40,17 @@ make up
    └─ Docling → Markdown → 段落感知切块 → OpenAI Embeddings → Qdrant points
 
 问题
-   ├─ OpenAI Embeddings → Qdrant tenant filter + top-k dense search
-   └─ 可见召回片段 → OpenAI Agents SDK Agent → 回答 + [证据 N] 引用
+   ├─ 只看召回：OpenAI Embeddings → Qdrant tenant filter + top-k dense search
+   └─ Agent 问答：Agent → search_knowledge 工具 → embedding + Qdrant → 流式回答 + [证据 N] 引用
 ```
 
 Web 界面提供两个操作：
 
 - **只看召回**：只跑 embedding 和 Qdrant，展示命中文本、来源、chunk 序号、score，不调用 Chat 模型。
-- **检索 + Agent 回答**：使用相同 top-k 检索结果作为 Agent 输入，再并排展示答案与引用证据。
+- **检索 + Agent 回答**：Agent 先调用 `search_knowledge`，在当前知识空间内检索，再基于工具返回的证据逐步回答。工具调用在回复下方以小字展示，可展开查看检索问题和耗时。
+- **停止生成**：中断当前请求并取消 Agent 运行，保留已显示的回复和证据。
+
+普通问答接口 `POST /api/chat` 返回完整 JSON；网页使用 `POST /api/chat/stream` 接收 SSE 事件，包含工具开始、工具完成、证据、文字增量和最终结果。知识空间和 top-k 由服务端绑定到工具，模型不能通过工具参数选择其他知识空间。
 
 这让你可以分辨问题出在召回还是生成：如果正确段落没有出现在“召回证据”里，先调查文档解析、切块、embedding 和 top-k；若证据正确但答案错误，再调查提示词、模型行为或引用约束。
 
@@ -55,7 +58,7 @@ Web 界面提供两个操作：
 
 1. 在 UI 上传示例 Markdown，等待入库成功，注意 chunk 数量。
 2. 问“青禾平台的线下窗口几点开放？”，先点“只看召回”，检查召回片段是否包含 09:00–17:00。
-3. 再点“检索 + Agent 回答”，确认回答引用 `[证据 1]` 等编号，并核对展示的证据原文。
+3. 再点“检索 + Agent 回答”，观察回复下方的检索状态和逐步显示的文字；确认回答引用 `[证据 1]` 等编号，并展开“召回证据”核对原文。Agent 的检索问题可能经过改写，因此召回结果可能与“只看召回”略有不同。
 4. 对照问“如何修改预约？”和“资料最后更新时间是什么？”，看看不同表达能否召回同一段。
 5. 问“青禾平台推荐什么药物剂量？”，观察 Agent 是否承认资料没有覆盖。
 6. 修改示例文档中的说法或增加一段内容，再次入库后比较召回变化。删除旧文档可在文档列表点击“删除”。
